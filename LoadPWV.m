@@ -775,7 +775,6 @@ elseif pcDataIter==1
 else
     disp('Loading Process Complete...');
     set(handles.ErrorMessageBar,'String','Loading Process Complete...');
-    Anatomical_Images(anatDatasets);
     AnalyzePWV(pcDatasets,magDatasets)
 end 
 
