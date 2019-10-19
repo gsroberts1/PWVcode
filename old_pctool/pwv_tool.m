@@ -1462,7 +1462,7 @@ ylabel('Flow (ml/s)');
 function [ttp, ttf, ttu] = compute_tt_2d(handles, time, flow)
 
 % Time to peak
-[c,index] = max(flow); % 2010-11-23 removed abs
+[c,index] = max(flow);
 clear c;
 if length(index) > 1
     index = index(1);

@@ -310,8 +310,8 @@ else
         for i=1:length(dirInfo)
             temp(:,:,i) = single(dicomread(fullfile(pcDir,dirInfo(i).name)));
         end   
-        data.mag = temp(:,:,1:floor(length(dirInfo)/2)); %%maybe change to velocity
-        data.cd = temp(:,:,floor(length(dirInfo)/2)+1:end);
+        data.v = temp(:,:,1:floor(length(dirInfo)/2)); %%maybe change to velocity
+        data.mag = temp(:,:,floor(length(dirInfo)/2)+1:end);
     else
         fid = fopen([pcDir '\pcvipr_header.txt'], 'r');
         dataArray = textscan(fid, '%s%s%[^\n\r]', 'Delimiter', ' ', 'MultipleDelimsAsOne', true, 'ReturnOnError', false);
