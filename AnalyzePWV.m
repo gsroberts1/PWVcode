@@ -57,19 +57,27 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     % Update handles structure
     guidata(hObject, handles);
 
-    global zoomed spanUD spanLR
-    handles.pcDatasets = varargin{1};
-    handles.magDatasets = varargin{2};
+    global zoomed zoomedAnat spanUD spanLR spanUDAnat spanLRAnat interp 
+    handles.anatDatasets = varargin{1};
+    handles.pcDatasets = varargin{2};
+    handles.magDatasets = varargin{3};
     handles.pcDatasets(1).ROI = [];
     handles.magDatasets(1).ROI = [];
     handles.pcDatasets(1).ROIdata = [];
     zoomed = 0;
+    zoomedAnat = 0;
     spanUD = [0,0];
     spanLR = [0,0];
+    spanUDAnat = [0,0];
+    spanLRAnat = [0,0];
+    interp = 1;
     set(handles.PlanePopup,'String',{handles.pcDatasets.Names});
     set(handles.DatasetPopup,'String',fieldnames(handles.pcDatasets(1).Data));
+    set(handles.InterpolatePopup,'String',{'1x','2x','4x','Spline'});
+    set(handles.AnatListbox,'String',{handles.anatDatasets.Names});
     guidata(hObject, handles);
     updateImages(handles);
+    updateAnatImages(handles);
     if numel(handles.magDatasets)==0
         set(handles.MAGRadio,'Enable','off')
     end 
@@ -78,6 +86,7 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
 function varargout = AnalyzePWV_OutputFcn(hObject, eventdata, handles) 
     varargout{1} = handles.output;
 
+    
     
 % --- ZOOM BUTTON - CALLBACK
 function ZoomButton_Callback(hObject, eventdata, handles)
@@ -173,7 +182,7 @@ function DeleteROIbutton_Callback(hObject, eventdata, handles)
     
 % --- ANALYZE ROI BUTTON - CALLBACK
 function AnalyzeROIbutton_Callback(hObject, eventdata, handles)
-    global spanUD spanLR zoomed
+    global spanUD spanLR zoomed interp
     planeNum = get(handles.PlanePopup,'Value');
     if get(handles.PCRadio,'Value')
         v = handles.pcDatasets(planeNum).Data.v;
@@ -211,10 +220,49 @@ function AnalyzeROIbutton_Callback(hObject, eventdata, handles)
             end 
             area = sum(roiMask(:))*(xres)^2;
             flowROI(i) = area.*meanROI(i);
-        end         
+        end 
         times = timeres.*(1:length(flowROI));
-        dFlow = derivative(abs(flowROI));
-        dMean = derivative(abs(meanROI));
+        dFlow = abs(derivative(flowROI));
+        dMean = abs(derivative(meanROI));
+        
+        switch interp
+            case 2
+                t = 1:length(flowROI);
+                tq = 1:0.5:length(flowROI);
+                meanROI = interp1(t,meanRoi,tq);
+                medianROI = interp1(t,medianRoi,tq);
+                maxROI = interp1(t,fmaxRoi,tq);
+                minROI = interp1(t,minRoi,tq);
+                stdROI = interp1(t,stdRoi,tq);
+                flowROI = interp1(t,flowRoi,tq);
+                dFlow = abs(derivative(flowROI));
+                dMean = abs(derivative(meanROI));
+                times = timeres.*(1:0.5:length(flowROI));
+            case 4
+                t = 1:length(flowROI);
+                tq = 1:0.25:length(flowROI);
+                meanROI = interp1(t,meanRoi,tq);
+                medianROI = interp1(t,medianRoi,tq);
+                maxROI = interp1(t,fmaxRoi,tq);
+                minROI = interp1(t,minRoi,tq);
+                stdROI = interp1(t,stdRoi,tq);
+                flowROI = interp1(t,flowRoi,tq);
+                dFlow = abs(derivative(flowROI));
+                dMean = abs(derivative(meanROI));
+                times = timeres.*(1:0.25:length(flowROI));
+            case 'Spline'
+                t = 1:length(flowROI);
+                tq = 1:0.1:length(flowROI);
+                meanROI = spline(t,meanRoi,tq);
+                medianROI = spline(t,medianRoi,tq);
+                maxROI = spline(t,fmaxRoi,tq);
+                minROI = spline(t,minRoi,tq);
+                stdROI = spline(t,stdRoi,tq);
+                flowROI = spline(t,flowRoi,tq);
+                dFlow = abs(derivative(flowROI));
+                dMean = abs(derivative(meanROI));
+                times = timeres.*(1:0.25:length(flowROI));
+        end 
         roiStatistics.radius = radius;
         roiStatistics.center = center;
         roiStatistics.roiMask = roiMask;
@@ -325,7 +373,7 @@ function MAGRadio_Callback(hObject, eventdata, handles)
 
 % --- ANATOMICAL SLIDER - CALLBACK
 function SliderAnatomical_Callback(hObject, eventdata, handles)
-
+    updateAnatImages(handles);
 
 % --- ANATOMICAL SLIDER - CREATE FUNCTION
 function SliderAnatomical_CreateFcn(hObject, eventdata, handles)
@@ -336,7 +384,7 @@ function SliderAnatomical_CreateFcn(hObject, eventdata, handles)
 
 % --- ANATOMICAL LISTBOX - CALLBACK
 function AnatListbox_Callback(hObject, eventdata, handles)
-
+    updateAnatImages(handles);
 
 % --- ANATOMICAL LISTBOX - CREATE FUNCTION
 function AnatListbox_CreateFcn(hObject, eventdata, handles)
@@ -347,11 +395,21 @@ function AnatListbox_CreateFcn(hObject, eventdata, handles)
 
 % --- ZOOM ANATOMICAL - CALLBACK
 function ZoomAnatomicalButton_Callback(hObject, eventdata, handles)
-
+    global zoomedAnat spanUDAnat spanLRAnat
+    disp('Draw an ROI to zoom in');
+    rect = drawrectangle;
+    positions = round(rect.Position);
+    spanUDAnat = spanUDAnat(1)+positions(2):(spanUDAnat(1)+positions(2)+positions(4));
+    spanLRAnat = spanLRAnat(1)+positions(1):(spanLRAnat(1)+positions(1)+positions(3));
+    zoomedAnat = 1;
+    updateAnatImages(handles);
+    
 
 % --- UNZOOM ANATOMICAL - CALLBACK
 function UnzoomAnatomicalButton_Callback(hObject, eventdata, handles)
-
+    global zoomedAnat spanUDAnat spanLRAnat
+    zoomedAnat = 0; spanUDAnat = 0; spanLRAnat = 0;
+    updateAnatImages(handles);
 
 % --- DRAW CENTERLINE - CALLBACK
 function DrawCenterlineButton_Callback(hObject, eventdata, handles)
@@ -366,6 +424,28 @@ function ComputeCenterlineButton_Callback(hObject, eventdata, handles)
 
 % --- SHOW PLANE RADIO - CALLBACK
 function ShowPlanesRadio_Callback(hObject, eventdata, handles)
+
+
+% --- INTERPOLATE POPUP - CALLBACK
+function InterpolatePopup_Callback(hObject, eventdata, handles)
+    global interp
+    interpType = get(handles.InterpolatePopup,'Value');
+    switch interpType
+        case 2 
+            interp = 2;
+        case 3 
+            interp = 4;
+        case 4
+            interp = 'Spline';
+        otherwise
+    end 
+    AnalyzeROIbutton_Callback(hObject, eventdata, handles)
+
+% --- INTERPOLATE POPUP - CREATE FUNCTION
+function InterpolatePopup_CreateFcn(hObject, eventdata, handles)
+    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+        set(hObject,'BackgroundColor','white');
+    end
 
     
 % --- PLANE PLOT - CREATE FUNCTION
@@ -435,14 +515,25 @@ function varargout = updateImages(varargin)
     
 % --- Update Images in ANATOMICAL PLOT
 function updateAnatImages(handles)
-    datasetNum = get(handles.DatasetListbox,'Value');
-    imageSet = handles.anatDatasets(datasetNum).Data;
+    global zoomedAnat spanUDAnat spanLRAnat
+    datasetNum = get(handles.AnatListbox,'Value');
+    images = handles.anatDatasets(datasetNum).Data;
 
-    dim3size = size(imageSet,3);
-    steps = [1/(dim3size-1) 10/(dim3size-1)];
-    set(handles.ImageSlider, 'SliderStep', steps);
-    sliceNum = 1+round( get(handles.SliderAnatomical,'Value').*(dim3size-1) );
-    anatSlice = imageSet(:,:,sliceNum);
+    if ndims(images)<3
+        steps = [1 1];
+        set(handles.SliderAnatomical, 'SliderStep', steps);
+        anatSlice = images;
+    else
+        dim3size = size(images,3);
+        steps = [1/(dim3size-1) 10/(dim3size-1)];
+        set(handles.SliderAnatomical, 'SliderStep', steps);
+        sliceNum = 1+round( get(handles.SliderAnatomical,'Value').*(dim3size-1) );
+        anatSlice = images(:,:,sliceNum);
+    end 
+    
+    if zoomedAnat
+        anatSlice = anatSlice(spanUDAnat,spanLRAnat);
+    end
 
     axes(handles.AnatomicalPlot); %show image
     imshow(anatSlice,[]);
@@ -523,28 +614,3 @@ function flow = organizeFlowInfo(handles)
             end 
         end 
     end 
-
-    
-% --- Executes on selection change in InterpolatePopup.
-function InterpolatePopup_Callback(hObject, eventdata, handles)
-    global interp
-    interpType = get(handles.InterpolatePopup,'Value');
-    switch interpType
-        case 2 
-            interp = 2;
-        case 3 
-            interp = 3;
-        case 4
-            interp = 'Spline';
-        otherwise
-    end 
-
-
-function InterpolatePopup_CreateFcn(hObject, eventdata, handles)
-    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-        set(hObject,'BackgroundColor','white');
-    end
-    set(handles.InterpolatePopup,'String',{'1x','2x','3x','Spline'});
-
-
-
