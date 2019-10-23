@@ -52,6 +52,7 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     % varargin   command line arguments to AnalyzePWV (see VARARGIN)
 
     % Choose default command line output for AnalyzePWV
+    set(gcf, 'units', 'normalized', 'position', [0.05 0.15 0.6 0.6])
     handles.output = hObject;
 
     % Update handles structure
@@ -538,6 +539,7 @@ plotVelocity(handles)
     
  
 
+
 %%%%%%%%%%%% ANATOMICAL PLANE %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 % --- ANATOMICAL PLOT - CREATE FUNCTION
@@ -569,22 +571,7 @@ function AnatListbox_CreateFcn(hObject, eventdata, handles)
     
 % --- SHOW PLANE RADIO - CALLBACK
 function ShowPlanesRadio_Callback(hObject, eventdata, handles) 
-    if get(handles.ShowPlanesRadio,'Value')
-        datasetNum = get(handles.AnatListbox,'Value');
-        yres = handles.anatDatasets(datasetNum).Info.PixelSpacing(2);
-        anatRotation = handles.anatDatasets(datasetNum).rotationMatrix;
-        colsRunningDir = sign(nonzeros(anatRotation(:,3)));
-        spanZ = handles.anatDatasets(datasetNum).spanZ;
-        for i=1:numel(handles.flow)
-            planeLinePhysical = colsRunningDir*(handles.flow(i).zLocs-spanZ(1));
-            planeLineRow = round(planeLinePhysical/yres);
-            handles.flow(i).planeLineRow = planeLineRow;
-            guidata(hObject,handles);
-        end 
-    end 
-    
-    updateAnatImages(handles);
-    guidata(hObject,handles);
+
     
 % --- ZOOM ANATOMICAL - CALLBACK
 function ZoomAnatomicalButton_Callback(hObject, eventdata, handles)
@@ -623,8 +610,22 @@ function DrawCenterlineButton_Callback(hObject, eventdata, handles)
     set(handles.ZoomAnatomicalButton,'Enable','off');
     set(handles.UnzoomAnatomicalButton,'Enable','off');
     set(handles.ShowPlanesRadio,'Value',1);
-    ShowPlanesRadio_Callback(hObject, eventdata, handles);
+    
+    datasetNum = get(handles.AnatListbox,'Value');
+    yres = handles.anatDatasets(datasetNum).Info.PixelSpacing(2);
+    anatRotation = handles.anatDatasets(datasetNum).rotationMatrix;
+    colsRunningDir = sign(nonzeros(anatRotation(:,3)));
+    spanZ = handles.anatDatasets(datasetNum).spanZ;
+    for i=1:numel(handles.flow)
+        planeLinePhysical = colsRunningDir*(handles.flow(i).zLocs-spanZ(1));
+        planeLineRow = round(planeLinePhysical/yres);
+        handles.flow(i).planeLineRow = planeLineRow;
+        guidata(hObject,handles);
+    end 
+    updateAnatImages(handles);
+    guidata(hObject,handles);
 
+    
     datasetNum = get(handles.AnatListbox,'Value');
     if isempty(handles.anatDatasets(datasetNum).Centerline)
         mydlg = warndlg('Press enter when the centerline is drawn');
@@ -695,7 +696,16 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
     line = [handles.anatDatasets.Length];
     centerline = [handles.anatDatasets.Centerline];
     planeRows = [handles.flow.planeLineRow];
+    x = centerline.Position(:,1);
+    y = centerline.Position(:,2);
     
+    difference = x-planeRows(1);
+    if difference(1)<0
+        firstZero = find(abs(difference)<1);
+    else
+        firstZero = differences(1);
+        secondZero = find(abs(difference)<1);
+    end 
        
 
     set(handles.DrawROIbutton,'Enable','off');

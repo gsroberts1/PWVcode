@@ -775,7 +775,8 @@ elseif pcDataIter==1
 else
     disp('Loading Process Complete...');
     set(handles.ErrorMessageBar,'String','Loading Process Complete...');
-    AnalyzePWV(anatDatasets,pcDatasets,magDatasets)
+    %AnalyzePWV(anatDatasets,pcDatasets,magDatasets)
+    AnalyzePWV_lite(anatDatasets,pcDatasets,magDatasets)
 end 
 
 % --- Executes during object creation, after setting all properties.

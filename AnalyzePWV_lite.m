@@ -1,4 +1,4 @@
-function varargout = AnalyzePWV(varargin)
+function varargout = AnalyzePWV_lite(varargin)
     % ANALYZEPWV MATLAB code for AnalyzePWV.fig
     %      ANALYZEPWV, by itself, creates a new ANALYZEPWV or raises the existing
     %      singleton*.
@@ -696,8 +696,6 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
     centerline = [handles.anatDatasets.Centerline];
     planeRows = [handles.flow.planeLineRow];
     
-       
-
     set(handles.DrawROIbutton,'Enable','off');
     set(handles.DeleteCenterlineButton,'Enable','off');
     set(handles.ShowPlanesRadio,'Enable','on');
@@ -709,7 +707,6 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
 
 
 
-    
 %%%%%%%%%%%% PWV PLOT %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 % --- PWV PLOT - CREATE FUNCTION
