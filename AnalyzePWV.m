@@ -22,7 +22,7 @@ function varargout = AnalyzePWV(varargin)
 
     % Edit the above text to modify the response to help AnalyzePWV
 
-    % Last Modified by GUIDE v2.5 20-Oct-2019 00:20:29
+    % Last Modified by GUIDE v2.5 22-Oct-2019 17:23:01
 
     % Begin initialization code - DO NOT EDIT
     gui_Singleton = 1;
@@ -58,7 +58,8 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     guidata(hObject, handles);
 
     global zoomed zoomedAnat spanUD spanLR spanUDAnat spanLRAnat
-    global  interpType requestInterp
+    global  interpType showErrorBars
+    
     handles.anatDatasets = varargin{1};
     handles.pcDatasets = varargin{2};
     handles.magDatasets = varargin{3};
@@ -69,7 +70,6 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     handles.pcDatasets(1).ROIdataMakima = [];
     handles.pcDatasets(1).ROIdataPCHIP = [];
     handles.pcDatasets(1).ROIdataSpline = [];
-    
     zoomed = 0;
     zoomedAnat = 0;
     spanUD = [0,0];
@@ -77,7 +77,7 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     spanUDAnat = [0,0];
     spanLRAnat = [0,0];
     interpType = 'None';
-    requestInterp = 0;
+    showErrorBars = 0;
     
     set(handles.PlanePopup,'String',{handles.pcDatasets.Names});
     set(handles.DatasetPopup,'String',fieldnames(handles.pcDatasets(1).Data));
@@ -89,13 +89,12 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     end 
     
     set(handles.ShowPlanesRadio,'Enable','off');
-    set(handles.ZoomAnatomicalButton,'Enable','off');
-    set(handles.UnzoomAnatomicalButton,'Enable','off');
     set(handles.DrawCenterlineButton,'Enable','off');
     set(handles.DeleteCenterlineButton,'Enable','off');
     set(handles.DeleteCenterlineButton,'Enable','off');
     set(handles.ComputePWVButton,'Enable','off');
-    
+    set(handles.ShowPlanesRadio,'Enable','off')
+        
     guidata(hObject, handles);
     updateImages(handles);
     updateAnatImages(handles);
@@ -149,6 +148,7 @@ function MAGRadio_Callback(hObject, eventdata, handles)
 % --- PLANE DROPDOWN - CALLBACK
 function PlanePopup_Callback(hObject, eventdata, handles)
     global zoomed spanUD spanLR
+    
     zoomed = 0; spanUD = 0; spanLR = 0;
     planeNum = get(handles.PlanePopup,'Value');
     if get(handles.PCRadio,'Value')
@@ -178,6 +178,8 @@ function DatasetPopup_CreateFcn(hObject, eventdata, handles)
 % --- ZOOM BUTTON - CALLBACK
 function ZoomButton_Callback(hObject, eventdata, handles)
     global zoomed spanUD spanLR
+    axes(handles.PlanePlot)
+    
     disp('Draw an ROI to zoom in');
     rect = drawrectangle;
     positions = round(rect.Position);
@@ -189,15 +191,29 @@ function ZoomButton_Callback(hObject, eventdata, handles)
     
 % --- UNZOOM BUTTON - CALLBACK
 function UnzoomButton_Callback(hObject, eventdata, handles)
-    global zoomed spanUD spanLR
+   global zoomed spanUD spanLR
+    axes(handles.PlanePlot)
+    
     zoomed = 0; spanUD = 0; spanLR = 0;
     updateImages(handles);
 
     
 % --- DRAWROI BUTTON - CALLBACK
 function DrawROIbutton_Callback(hObject, eventdata, handles)
-    planeNum = get(handles.PlanePopup,'Value');
     axes(handles.PlanePlot);
+    
+    if get(handles.PCRadio,'Value')
+        set(handles.MAGRadio,'Enable','off');
+    else 
+        set(handles.PCRadio,'Enable','off');
+    end 
+    set(handles.DrawROIbutton,'Enable','off');
+    set(handles.PlanePopup,'Enable','off');
+    set(handles.ZoomButton,'Enable','off');
+    set(handles.UnzoomButton,'Enable','off');
+    set(handles.PlaneSlider,'Enable','off');
+    
+    planeNum = get(handles.PlanePopup,'Value');
     if isempty(handles.pcDatasets(planeNum).ROI)
         mydlg = warndlg('Press enter when the ROI is set');
         waitfor(mydlg);
@@ -228,15 +244,6 @@ function DrawROIbutton_Callback(hObject, eventdata, handles)
         handles.magDatasets(planeNum).ROI = circle;
     end 
     
-    if get(handles.PCRadio,'Value')
-        set(handles.MAGRadio,'Enable','off');
-    else 
-        set(handles.PCRadio,'Enable','off');
-    end 
-    set(handles.DrawROIbutton,'Enable','off');
-    set(handles.PlanePopup,'Enable','off');
-    set(handles.ZoomButton,'Enable','off');
-    set(handles.UnzoomButton,'Enable','off');
     
     guidata(hObject,handles);
     updateImages(handles);
@@ -247,6 +254,8 @@ function DrawROIbutton_Callback(hObject, eventdata, handles)
     
 % --- DELETE ROI BUTTON - CALLBACK
 function DeleteROIbutton_Callback(hObject, eventdata, handles)
+   axes(handles.PlanePlot)
+   
     hold off
     planeNum = get(handles.PlanePopup,'Value');
     if get(handles.PCRadio,'Value')
@@ -269,222 +278,221 @@ function DeleteROIbutton_Callback(hObject, eventdata, handles)
     
 % --- LOAD ROI BUTTON - CALLBACK
 function LoadROIbutton_Callback(hObject, eventdata, handles)
-    global spanUD spanLR zoomed interpType requestInterp
-    if ~requestInterp
-        planeNum = get(handles.PlanePopup,'Value');
-        if get(handles.PCRadio,'Value')
-            v = handles.pcDatasets(planeNum).Data.v;
-            if zoomed
-                v = v(spanUD,spanLR,:);
-            end 
-            circle = handles.pcDatasets(planeNum).ROI;
-            radius = circle.Radius; 
-            center = round(circle.Center);
-
-            [X,Y] = ndgrid(1:size(v,1),1:size(v,2));
-            X = X-center(2); %shift coordinate grid
-            Y = Y-center(1);
-            roiMask = sqrt(X.^2+Y.^2)<=radius;
-
-            %%% Create Uninterpolated Data
-            for i=1:size(v,3)
-                vTemp = v(:,:,i);
-                roiDataRaw(:,i) = vTemp(roiMask);
-                meanROI(i) = mean(vTemp(roiMask));
-                medianROI(i) = median(vTemp(roiMask));
-                maxROI(i) = max(vTemp(roiMask));
-                minROI(i) = min(vTemp(roiMask));
-                stdROI(i) = std(vTemp(roiMask));
-                if isfield(handles.pcDatasets(planeNum).Info,'matrixx')
-                    matrixx = handles.pcDatasets(planeNum).Info.matrixx;
-                    fovx = handles.pcDatasets(planeNum).Info.fovx;
-                    xres = fovx/matrixx;
-                    timeres = handles.pcDatasets(planeNum).Info.timeres;
-                else 
-                    xres = handles.pcDatasets(planeNum).Info.PixelSpacing(1);
-                    bpm = handles.pcDatasets(planeNum).Info.HeartRate;
-                    frames = handles.pcDatasets(planeNum).Info.CardiacNumberOfImages;
-                    rrInterval = (60*1000)/bpm;
-                    timeres = rrInterval/frames;
-                end 
-                area = sum(roiMask(:))*(xres)^2;
-                flowROI(i) = area.*meanROI(i);
-            end 
-            times = timeres.*(1:length(flowROI));
-            dFlow = abs(derivative(flowROI));
-            dMean = abs(derivative(meanROI));
-
-            roiStatistics.radius = radius; roiStatistics.center = center;
-            roiStatistics.roiMask = roiMask; roiStatistics.roiDataRaw = roiDataRaw;
-            roiStatistics.times = times;
-            roiStatistics.meanROI = meanROI; roiStatistics.dMean = dMean;
-            roiStatistics.medianROI = medianROI;
-            roiStatistics.maxROI = maxROI; roiStatistics.minROI = minROI;
-            roiStatistics.stdROI = stdROI;
-            roiStatistics.flowROI = flowROI; roiStatistics.dFlow = dFlow;
-
-            if isstruct(handles.pcDatasets(planeNum).ROIdata)
-                handles.pcDatasets(planeNum).ROIdata(end+1) = roiStatistics;
-            else 
-                handles.pcDatasets(planeNum).ROIdata = roiStatistics;
-            end 
-
-            %%% Create Makima Fit
-            t = 1:length(flowROI);
-            tq = 1:0.25:length(flowROI);
-            interpTimes = timeres.*tq;
-            meanROIfit = interp1(t,meanROI,tq,'makima');
-            medianROIfit = interp1(t,medianROI,tq,'makima');
-            maxROIfit = interp1(t,maxROI,tq,'makima');
-            minROIfit = interp1(t,minROI,tq,'makima');
-            stdROIfit = interp1(t,stdROI,tq,'makima');
-            flowROIfit = interp1(t,flowROI,tq,'makima');
-            dFlowfit = interp1(t,dFlow,tq,'makima');
-            dMeanfit = interp1(t,dMean,tq,'makima');
-
-            roiStatisticsMakima.times = interpTimes;
-            roiStatisticsMakima.meanROI = meanROIfit; roiStatisticsMakima.dMean = dMeanfit;
-            roiStatisticsMakima.medianROI = medianROIfit;
-            roiStatisticsMakima.maxROI = maxROIfit; roiStatisticsMakima.minROI = minROIfit;
-            roiStatisticsMakima.stdROI = stdROIfit;
-            roiStatisticsMakima.flowROI = flowROIfit; roiStatisticsMakima.dFlow = dFlowfit;
-
-            if isstruct(handles.pcDatasets(planeNum).ROIdataMakima)
-                handles.pcDatasets(planeNum).ROIdataMakima(end+1) = roiStatisticsMakima;
-            else 
-                handles.pcDatasets(planeNum).ROIdataMakima = roiStatisticsMakima;
-            end 
-
-            %%% Create Piecewise Cubic Hermite Polynomial (PCHIP) Fit            
-            meanROIfit = interp1(t,meanROI,tq,'pchip');
-            medianROIfit = interp1(t,medianROI,tq,'pchip');
-            maxROIfit = interp1(t,maxROI,tq,'pchip');
-            minROIfit = interp1(t,minROI,tq,'pchip');
-            stdROIfit = interp1(t,stdROI,tq,'pchip');
-            flowROIfit = interp1(t,flowROI,tq,'pchip');
-            dFlowfit = interp1(t,dFlow,tq,'pchip');
-            dMeanfit = interp1(t,dMean,tq,'pchip');
-
-            roiStatisticsPCHIP.times = interpTimes;
-            roiStatisticsPCHIP.meanROI = meanROIfit; roiStatisticsPCHIP.dMean = dMeanfit;
-            roiStatisticsPCHIP.medianROI = medianROIfit;
-            roiStatisticsPCHIP.maxROI = maxROIfit; roiStatisticsPCHIP.minROI = minROIfit;
-            roiStatisticsPCHIP.stdROI = stdROIfit;
-            roiStatisticsPCHIP.flowROI = flowROIfit; roiStatisticsPCHIP.dFlow = dFlowfit;
-
-            if isstruct(handles.pcDatasets(planeNum).ROIdataPCHIP)
-                handles.pcDatasets(planeNum).ROIdataPCHIP(end+1) = roiStatisticsPCHIP;
-            else 
-                handles.pcDatasets(planeNum).ROIdataPCHIP = roiStatisticsPCHIP;
-            end 
-
-            %%% Create Cubic Spline Fit        
-            meanROIfit = interp1(t,meanROI,tq,'spline');
-            medianROIfit = interp1(t,medianROI,tq,'spline');
-            maxROIfit = interp1(t,maxROI,tq,'spline');
-            minROIfit = interp1(t,minROI,tq,'spline');
-            stdROIfit = interp1(t,stdROI,tq,'spline');
-            flowROIfit = interp1(t,flowROI,tq,'spline');
-            dFlowfit = interp1(t,dFlow,tq,'spline');
-            dMeanfit = interp1(t,dMean,tq,'spline');
-
-            roiStatisticsSpline.times = interpTimes;
-            roiStatisticsSpline.meanROI = meanROIfit; roiStatisticsSpline.dMean = dMeanfit;
-            roiStatisticsSpline.medianROI = medianROIfit;
-            roiStatisticsSpline.maxROI = maxROIfit; roiStatisticsSpline.minROI = minROIfit;
-            roiStatisticsSpline.stdROI = stdROIfit;
-            roiStatisticsSpline.flowROI = flowROIfit; roiStatisticsSpline.dFlow = dFlowfit;
-
-            if isstruct(handles.pcDatasets(planeNum).ROIdataSpline)
-                handles.pcDatasets(planeNum).ROIdataSpline(end+1) = roiStatisticsSpline;
-            else 
-                handles.pcDatasets(planeNum).ROIdataSpline = roiStatisticsSpline;
-            end 
-
-            clear dFlow dMean radius center roiMask area planeNum timeres v
-            clear roiDataRaw meanROI medianROI maxROI minROI stdROI flowROI  
-            clear dFlowfit dMeanfit circle matrixx t tq vTemp X Y xres i fovx
-            clear meanROIfit medianROIfit maxROIfit minROIfit stdROIfit flowROIfit  
-        end 
-    end
+    global spanUD spanLR zoomed
     
+    planeNum = get(handles.PlanePopup,'Value');
+    if get(handles.PCRadio,'Value')
+        v = handles.pcDatasets(planeNum).Data.v;
+        if zoomed
+            v = v(spanUD,spanLR,:);
+        end 
+        circle = handles.pcDatasets(planeNum).ROI;
+        radius = circle.Radius; 
+        center = round(circle.Center);
+
+        [X,Y] = ndgrid(1:size(v,1),1:size(v,2));
+        X = X-center(2); %shift coordinate grid
+        Y = Y-center(1);
+        roiMask = sqrt(X.^2+Y.^2)<=radius;
+
+        %%% Create Uninterpolated Data
+        for i=1:size(v,3)
+            vTemp = v(:,:,i);
+            roiDataRaw(:,i) = vTemp(roiMask);
+            meanROI(i) = mean(vTemp(roiMask));
+            medianROI(i) = median(vTemp(roiMask));
+            maxROI(i) = max(vTemp(roiMask));
+            minROI(i) = min(vTemp(roiMask));
+            stdROI(i) = std(vTemp(roiMask));
+            if isfield(handles.pcDatasets(planeNum).Info,'matrixx')
+                matrixx = handles.pcDatasets(planeNum).Info.matrixx;
+                fovx = handles.pcDatasets(planeNum).Info.fovx;
+                xres = fovx/matrixx;
+                timeres = handles.pcDatasets(planeNum).Info.timeres;
+            else 
+                xres = handles.pcDatasets(planeNum).Info.PixelSpacing(1);
+                bpm = handles.pcDatasets(planeNum).Info.HeartRate;
+                frames = handles.pcDatasets(planeNum).Info.CardiacNumberOfImages;
+                rrInterval = (60*1000)/bpm;
+                timeres = rrInterval/frames;
+            end 
+            area = sum(roiMask(:))*(xres)^2;
+            flowROI(i) = area.*meanROI(i);
+        end 
+        times = timeres.*(1:length(flowROI));
+        dFlow = abs(derivative(flowROI));
+        dMean = abs(derivative(meanROI));
+
+        roiStatistics.radius = radius; roiStatistics.center = center;
+        roiStatistics.roiMask = roiMask; roiStatistics.roiDataRaw = roiDataRaw;
+        roiStatistics.times = times;
+        roiStatistics.meanROI = meanROI; roiStatistics.dMean = dMean;
+        roiStatistics.medianROI = medianROI;
+        roiStatistics.maxROI = maxROI; roiStatistics.minROI = minROI;
+        roiStatistics.stdROI = stdROI;
+        roiStatistics.flowROI = flowROI; roiStatistics.dFlow = dFlow;
+
+        if isstruct(handles.pcDatasets(planeNum).ROIdata)
+            handles.pcDatasets(planeNum).ROIdata(end+1) = roiStatistics;
+        else 
+            handles.pcDatasets(planeNum).ROIdata = roiStatistics;
+        end 
+
+        %%% Create Makima Fit
+        t = 1:length(flowROI);
+        tq = 1:0.25:length(flowROI);
+        interpTimes = timeres.*tq;
+        meanROIfit = interp1(t,meanROI,tq,'makima');
+        medianROIfit = interp1(t,medianROI,tq,'makima');
+        maxROIfit = interp1(t,maxROI,tq,'makima');
+        minROIfit = interp1(t,minROI,tq,'makima');
+        stdROIfit = interp1(t,stdROI,tq,'makima');
+        flowROIfit = interp1(t,flowROI,tq,'makima');
+        dFlowfit = interp1(t,dFlow,tq,'makima');
+        dMeanfit = interp1(t,dMean,tq,'makima');
+
+        roiStatisticsMakima.times = interpTimes;
+        roiStatisticsMakima.meanROI = meanROIfit; roiStatisticsMakima.dMean = dMeanfit;
+        roiStatisticsMakima.medianROI = medianROIfit;
+        roiStatisticsMakima.maxROI = maxROIfit; roiStatisticsMakima.minROI = minROIfit;
+        roiStatisticsMakima.stdROI = stdROIfit;
+        roiStatisticsMakima.flowROI = flowROIfit; roiStatisticsMakima.dFlow = dFlowfit;
+
+        if isstruct(handles.pcDatasets(planeNum).ROIdataMakima)
+            handles.pcDatasets(planeNum).ROIdataMakima(end+1) = roiStatisticsMakima;
+        else 
+            handles.pcDatasets(planeNum).ROIdataMakima = roiStatisticsMakima;
+        end 
+
+        %%% Create Piecewise Cubic Hermite Polynomial (PCHIP) Fit            
+        meanROIfit = interp1(t,meanROI,tq,'pchip');
+        medianROIfit = interp1(t,medianROI,tq,'pchip');
+        maxROIfit = interp1(t,maxROI,tq,'pchip');
+        minROIfit = interp1(t,minROI,tq,'pchip');
+        stdROIfit = interp1(t,stdROI,tq,'pchip');
+        flowROIfit = interp1(t,flowROI,tq,'pchip');
+        dFlowfit = interp1(t,dFlow,tq,'pchip');
+        dMeanfit = interp1(t,dMean,tq,'pchip');
+
+        roiStatisticsPCHIP.times = interpTimes;
+        roiStatisticsPCHIP.meanROI = meanROIfit; roiStatisticsPCHIP.dMean = dMeanfit;
+        roiStatisticsPCHIP.medianROI = medianROIfit;
+        roiStatisticsPCHIP.maxROI = maxROIfit; roiStatisticsPCHIP.minROI = minROIfit;
+        roiStatisticsPCHIP.stdROI = stdROIfit;
+        roiStatisticsPCHIP.flowROI = flowROIfit; roiStatisticsPCHIP.dFlow = dFlowfit;
+
+        if isstruct(handles.pcDatasets(planeNum).ROIdataPCHIP)
+            handles.pcDatasets(planeNum).ROIdataPCHIP(end+1) = roiStatisticsPCHIP;
+        else 
+            handles.pcDatasets(planeNum).ROIdataPCHIP = roiStatisticsPCHIP;
+        end 
+
+        %%% Create Cubic Spline Fit        
+        meanROIfit = interp1(t,meanROI,tq,'spline');
+        medianROIfit = interp1(t,medianROI,tq,'spline');
+        maxROIfit = interp1(t,maxROI,tq,'spline');
+        minROIfit = interp1(t,minROI,tq,'spline');
+        stdROIfit = interp1(t,stdROI,tq,'spline');
+        flowROIfit = interp1(t,flowROI,tq,'spline');
+        dFlowfit = interp1(t,dFlow,tq,'spline');
+        dMeanfit = interp1(t,dMean,tq,'spline');
+
+        roiStatisticsSpline.times = interpTimes;
+        roiStatisticsSpline.meanROI = meanROIfit; roiStatisticsSpline.dMean = dMeanfit;
+        roiStatisticsSpline.medianROI = medianROIfit;
+        roiStatisticsSpline.maxROI = maxROIfit; roiStatisticsSpline.minROI = minROIfit;
+        roiStatisticsSpline.stdROI = stdROIfit;
+        roiStatisticsSpline.flowROI = flowROIfit; roiStatisticsSpline.dFlow = dFlowfit;
+
+        if isstruct(handles.pcDatasets(planeNum).ROIdataSpline)
+            handles.pcDatasets(planeNum).ROIdataSpline(end+1) = roiStatisticsSpline;
+        else 
+            handles.pcDatasets(planeNum).ROIdataSpline = roiStatisticsSpline;
+        end 
+
+        clear dFlow dMean radius center roiMask area planeNum timeres v
+        clear roiDataRaw meanROI medianROI maxROI minROI stdROI flowROI  
+        clear dFlowfit dMeanfit circle matrixx t tq vTemp X Y xres i fovx
+        clear meanROIfit medianROIfit maxROIfit minROIfit stdROIfit flowROIfit  
+    end 
+
     %%% Plot Curves
     handles.flow = organizeFlowInfo(handles);
-    legendSet = {'Baseline',handles.flow.Name};
-    count = length(legendSet)-1;
-    times = handles.flow(1).Data.times;
-    
-    cla(handles.VelocityPlot,'reset')
-    axes(handles.VelocityPlot);
-    hold on; plot(times, zeros(1,length(times)) ,'Color','black','LineWidth',1.5);
-    for i=1:count
-        switch interpType
-            case 'None'
-                flow = handles.flow(i).Data.meanROI;
-            case 'Makima'
-                times = handles.flow(i).Makima.times;
-                flow = handles.flow(i).Makima.meanROI;
-            case 'PCHIP'
-                times = handles.flow(i).PCHIP.times;
-                flow = handles.flow(i).PCHIP.meanROI;           
-            case 'Spline'
-                times = handles.flow(i).Spline.times;
-                flow = handles.flow(i).Spline.meanROI;    
-            otherwise
-        end
-        
-        if mean(flow)<0
-            hold on; plot(times, -1*flow);
-        else 
-            hold on; plot(times, flow);
-        end 
-    end 
-    legend(legendSet); hold off
-    xlabel('Time (ms)'); ylabel('Mean Velocity in ROI (mm/s)');
-    xlim([times(1),times(end)]);
+    plotVelocity(handles);
     
     clear times interpTimes area count i 
     clear roiStatistics roiStatisticsMakima roiStatisticsPCHIP roiStatisticsSpline
     set(handles.InterpolatePopup,'Enable','on');
-    
-%     if numel(handles.flow)>1
-%         allROIs = 1:numel(handles.flow);
-%         handles.centerline.whichPlanes = [];
-%         handles.centerline.whichIndices = {};
-%         for i=1:numel(handles.flow)
-%             ROIs2compare = allROIs ~= i;
-%             ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
-%             for j=1:length(ROIs2compare)
-%                 iterator = ROIs2compare(j);
-%                 if iterator>i
-%                     currName = handles.flow(i).Name;
-%                     compareString = [currName ' --> ' handles.flow(iterator).Name];
-%                     handles.centerline.whichPlanes(end+1) = compareString;
-%                     handles.centerline.whichIndices(end+1) = [i,iterator];
-%                 end 
-%             end  
-%         end 
-%     end 
 
-    requestInterp = 0;
     guidata(hObject,handles);
     DeleteROIbutton_Callback(hObject, eventdata, handles);
     updateImages(handles);
     axes(handles.PlanePlot);
-
     
 % --- COMPLETE LOADING BUTTON - CALLBACK
 function CompleteLoadingROI_Callback(hObject, eventdata, handles)
-    set(handles.DrawROIbutton,'Enable','off');
     set(handles.DeleteROIbutton,'Enable','off');
     set(handles.LoadROIbutton,'Enable','off');
-
+    
+    set(handles.DrawCenterlineButton,'Enable','on');
     set(handles.ShowPlanesRadio,'Enable','on');
     set(handles.ZoomAnatomicalButton,'Enable','on');
     set(handles.UnzoomAnatomicalButton,'Enable','on');
-    set(handles.IdentifyPlanesButton,'Enable','on');
+    
+    zLocs = EnterZslices(handles.flow);
+    
+    for i=1:numel(handles.flow)
+        handles.flow(i).zLocs = zLocs(i);
+    end 
+    guidata(hObject,handles);
+    
+    
+    for i =1:numel(handles.anatDatasets)
+        images = handles.anatDatasets(i).Data;
+        dims(1) = size(images,1);
+        dims(2) = size(images,2);
+        dims(3) = size(images,3);
+        handles.anatDatasets(i).dims = dims;
 
+        originShift = [handles.anatDatasets(i).Info.ImagePositionPatient;1]; % origin is top left corner of image
+        xres = handles.anatDatasets(i).Info.PixelSpacing(1);
+        yres = handles.anatDatasets(i).Info.PixelSpacing(2);
+        zres = handles.anatDatasets(i).Info.SliceThickness;
+        
+        % sometimes get extremely small values that should be 0, so round
+        xVector = round( handles.anatDatasets(i).Info.ImageOrientationPatient(1:3) ,8); % what direction rows run w/r/to x
+        yVector = round( handles.anatDatasets(i).Info.ImageOrientationPatient(4:6) ,8); % what direction the cols run w/r/to y
+        zVector = [cross(xVector,yVector);0];
+        xVector = [xVector;0];
+        yVector = [yVector;0];
+        rotationMatrix = [xres*xVector yres*yVector zres*zVector originShift];
+        sliceDim = find(rotationMatrix(:,3));
+        handles.anatDatasets(i).rotationMatrix = rotationMatrix;     
+        handles.anatDatasets(i).sliceDim = sliceDim;
 
+        
+        topFrontLeft = rotationMatrix*[1;1;1;1];
+        topFrontLeft(4) = []; % remove dummy dimension
+        backBottomRight = rotationMatrix*[dims(1);dims(2);dims(3);1];
+        backBottomRight(4) = [];
+        spanZ(1) = topFrontLeft(3);
+        spanZ(2) = backBottomRight(3);
+        handles.anatDatasets(i).spanZ = spanZ;
+    end   
+    
+    datasetNum = get(handles.AnatListbox,'Value');
+    anatRotation = handles.anatDatasets(datasetNum).rotationMatrix;
+    colsRunningDir = sign(nonzeros(anatRotation(:,3)));
+    spanZ = handles.anatDatasets(datasetNum).spanZ;
+    for i=1:numel(handles.flow)
+        planeLinePhysical = colsRunningDir*(handles.flow(i).zLocs-spanZ(1));
+        planeLineRow = round(planeLinePhysical/yres);
+        handles.flow(i).planeLineRow = planeLineRow;
+        guidata(hObject,handles);
+    end 
+    guidata(hObject,handles);
+    
+    
     
     
 %%%%%%%%%%%% VELOCITY PLOT %%%%%%%%%%%%%%
@@ -495,9 +503,9 @@ function VelocityPlot_CreateFcn(hObject, eventdata, handles)
 
 % --- INTERPOLATE POPUP - CALLBACK
 function InterpolatePopup_Callback(hObject, eventdata, handles)
-    global interpType requestInterp
+    global interpType
+    
     interp = get(handles.InterpolatePopup,'Value');
-    requestInterp = 1;
     switch interp
         case 1
             interpType = 'None';
@@ -509,7 +517,8 @@ function InterpolatePopup_Callback(hObject, eventdata, handles)
             interpType = 'Spline';
         otherwise
     end 
-    LoadROIbutton_Callback(hObject, eventdata, handles)
+    
+    plotVelocity(handles)
 
 % --- INTERPOLATE POPUP - CREATE FUNCTION
 function InterpolatePopup_CreateFcn(hObject, eventdata, handles)
@@ -517,9 +526,18 @@ function InterpolatePopup_CreateFcn(hObject, eventdata, handles)
         set(hObject,'BackgroundColor','white');
     end
     
-  
+  % --- Executes on button press in ErrorBarRadio.
+function ErrorBarRadio_Callback(hObject, eventdata, handles)
+global showErrorBars
+if get(handles.ErrorBarRadio,'Value')
+    showErrorBars = 1;
+else 
+    showErrorBars = 0;
+end 
+plotVelocity(handles)
     
-    
+ 
+
 %%%%%%%%%%%% ANATOMICAL PLANE %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 % --- ANATOMICAL PLOT - CREATE FUNCTION
@@ -539,6 +557,7 @@ function SliderAnatomical_CreateFcn(hObject, eventdata, handles)
  
 % --- ANATOMICAL LISTBOX - CALLBACK
 function AnatListbox_Callback(hObject, eventdata, handles)
+    ShowPlanesRadio_Callback(hObject, eventdata, handles)
     updateAnatImages(handles);
 
 % --- ANATOMICAL LISTBOX - CREATE FUNCTION
@@ -550,13 +569,29 @@ function AnatListbox_CreateFcn(hObject, eventdata, handles)
     
 % --- SHOW PLANE RADIO - CALLBACK
 function ShowPlanesRadio_Callback(hObject, eventdata, handles) 
- 
+    if get(handles.ShowPlanesRadio,'Value')
+        datasetNum = get(handles.AnatListbox,'Value');
+        yres = handles.anatDatasets(datasetNum).Info.PixelSpacing(2);
+        anatRotation = handles.anatDatasets(datasetNum).rotationMatrix;
+        colsRunningDir = sign(nonzeros(anatRotation(:,3)));
+        spanZ = handles.anatDatasets(datasetNum).spanZ;
+        for i=1:numel(handles.flow)
+            planeLinePhysical = colsRunningDir*(handles.flow(i).zLocs-spanZ(1));
+            planeLineRow = round(planeLinePhysical/yres);
+            handles.flow(i).planeLineRow = planeLineRow;
+            guidata(hObject,handles);
+        end 
+    end 
+    
+    updateAnatImages(handles);
+    guidata(hObject,handles);
     
 % --- ZOOM ANATOMICAL - CALLBACK
 function ZoomAnatomicalButton_Callback(hObject, eventdata, handles)
     global zoomedAnat spanUDAnat spanLRAnat
-    disp('Draw an ROI to zoom in');
     axes(handles.AnatomicalPlot)
+    
+    disp('Draw an ROI to zoom in');
     rect = drawrectangle;
     positions = round(rect.Position);
     spanUDAnat = spanUDAnat(1)+positions(2):(spanUDAnat(1)+positions(2)+positions(4));
@@ -568,45 +603,29 @@ function ZoomAnatomicalButton_Callback(hObject, eventdata, handles)
 % --- UNZOOM ANATOMICAL - CALLBACK
 function UnzoomAnatomicalButton_Callback(hObject, eventdata, handles)
     global zoomedAnat spanUDAnat spanLRAnat
+    axes(handles.AnatomicalPlot)
+    
     zoomedAnat = 0; spanUDAnat = 0; spanLRAnat = 0;
     updateAnatImages(handles);
 
+
+% --- DRAW CENTERLINE - CALLBACK
+function DrawCenterlineButton_Callback(hObject, eventdata, handles)
+    axes(handles.AnatomicalPlot); 
     
-% --- IDENTIFY PLANES - CALLBACK
-function IdentifyPlanesButton_Callback(hObject, eventdata, handles)
-    set(handles.DrawCenterlineButton,'Enable','on');
+    set(handles.ShowPlanesRadio,'Value',1);
+    set(handles.ShowPlanesRadio,'Enable','off');
+    set(handles.DrawROIbutton,'Enable','off');
     set(handles.DeleteCenterlineButton,'Enable','on');
     set(handles.ComputePWVButton,'Enable','on');
-    
-    set(handles.ShowPlanesRadio,'Enable','off');
     set(handles.SliderAnatomical,'Enable','off');
     set(handles.AnatListbox,'Enable','off');
     set(handles.ZoomAnatomicalButton,'Enable','off');
     set(handles.UnzoomAnatomicalButton,'Enable','off');
-    
-    datasetNum = get(handles.AnatListbox,'Value');
-    roiNames = {handles.flow.Name};
-    axes(handles.AnatomicalPlot);   
-    if isempty(handles.anatDatasets(datasetNum).Centerline)
-        mydlg = warndlg(['Select the physical location of the ' num2str(length(roiNames)) ' chosen planes.']);
-        waitfor(mydlg);
-        for i=1:length(roiNames)
-            handles.centerline(i).Name = roiNames{i};
-            point = drawpoint;
-            handles.centerline(i).Point = point;
-        end 
-    guidata(hObject,handles);
-    updateImages(handles);
-    else
-        fprintf('A Centerline has already been placed!\n');
-    end 
-
-% --- DRAW CENTERLINE - CALLBACK
-function DrawCenterlineButton_Callback(hObject, eventdata, handles)
-    set(handles.DrawROIbutton,'Enable','off');
+    set(handles.ShowPlanesRadio,'Value',1);
+    ShowPlanesRadio_Callback(hObject, eventdata, handles);
 
     datasetNum = get(handles.AnatListbox,'Value');
-    axes(handles.AnatomicalPlot);   
     if isempty(handles.anatDatasets(datasetNum).Centerline)
         mydlg = warndlg('Press enter when the centerline is drawn');
         waitfor(mydlg);
@@ -640,8 +659,8 @@ function DrawCenterlineButton_Callback(hObject, eventdata, handles)
         else 
             xres = handles.anatDatasets(datasetNum).Info.PixelSpacing(1);
         end
-    handles.centerline(1).Length = lineLength.*xres;
-    handles.centerline(1).Centerline = line;
+    handles.anatDatasets(datasetNum).Length = lineLength.*xres;
+    handles.anatDatasets(datasetNum).Centerline = line;
     
     guidata(hObject,handles);
     updateImages(handles);
@@ -651,32 +670,45 @@ function DrawCenterlineButton_Callback(hObject, eventdata, handles)
 
 % --- DELETE CENTERLINE - CALLBACK
 function DeleteCenterlineButton_Callback(hObject, eventdata, handles)
-    hold off
-    guidata(hObject,handles);
     cla(handles.AnatomicalPlot,'reset');
-    updateAnatImages(handles);
     
+    datasetNum = get(handles.AnatListbox,'Value');
+    handles.anatDatasets(datasetNum).Centerline = [];
+
     set(handles.ShowPlanesRadio,'Enable','on');
     set(handles.DrawROIbutton,'Enable','on');
     set(handles.AnatListbox,'Enable','on');
     set(handles.ZoomAnatomicalButton,'Enable','on');
     set(handles.UnzoomAnatomicalButton,'Enable','on');
+    set(handles.SliderAnatomical,'Enable','on');
+    set(handles.ShowPlanesRadio,'Value',0);
     
-
+    hold off
+    guidata(hObject,handles);
+    updateAnatImages(handles);
+    
+    
+    
 % --- COMPUTE PWV - CALLBACK
 function ComputePWVButton_Callback(hObject, eventdata, handles)
-    guidata(hObject,handles);
-    updateImages(handles);
-    set(handles.MAGRadio,'Enable','on');
-    set(handles.PCRadio,'Enable','on');
-    set(handles.DrawROIbutton,'Enable','on');
-    set(handles.PlanePopup,'Enable','on');
-    set(handles.ZoomButton,'Enable','on');
-    set(handles.UnzoomButton,'Enable','on');
-    set(handles.AnatListbox,'Enable','on');
-
-
     
+    line = [handles.anatDatasets.Length];
+    centerline = [handles.anatDatasets.Centerline];
+    planeRows = [handles.flow.planeLineRow];
+    
+       
+
+    set(handles.DrawROIbutton,'Enable','off');
+    set(handles.DeleteCenterlineButton,'Enable','off');
+    set(handles.ShowPlanesRadio,'Enable','on');
+    set(handles.AnatListbox,'Enable','on');
+    set(handles.ZoomAnatomicalButton,'Enable','on');
+    set(handles.UnzoomAnatomicalButton,'Enable','on');
+    set(handles.SliderAnatomical,'Enable','on');
+   
+
+
+
     
 %%%%%%%%%%%% PWV PLOT %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -720,6 +752,7 @@ function averageData_CreateFcn(hObject, eventdata, handles)
 
 
 
+
 %%%%%%%%%%%% MY FUNCTIONS %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
 
@@ -727,10 +760,12 @@ function averageData_CreateFcn(hObject, eventdata, handles)
 function varargout = updateImages(varargin)
     global spanUD spanLR zoomed 
     handles = varargin{1};
+    axes(handles.PlanePlot);
+    
     planeNum = get(handles.PlanePopup,'Value');
     datasetNum = get(handles.DatasetPopup,'Value');
+    
     isPC = get(handles.PCRadio,'Value');
-
     if isPC
         dataset = handles.pcDatasets;
     else
@@ -767,7 +802,7 @@ function varargout = updateImages(varargin)
     end 
 
     varargout{1} = slice;   
-    axes(handles.PlanePlot);
+    
     if ~isempty(handles.pcDatasets(planeNum).ROI)
         hold on
         imshow(slice,[]);
@@ -778,7 +813,9 @@ function varargout = updateImages(varargin)
     
 % --- Update Images in ANATOMICAL PLOT
 function updateAnatImages(handles)
-    global zoomedAnat spanUDAnat spanLRAnat
+    global zoomedAnat spanUDAnat spanLRAnat 
+    axes(handles.AnatomicalPlot); %show image
+    
     datasetNum = get(handles.AnatListbox,'Value');
     images = handles.anatDatasets(datasetNum).Data;
 
@@ -797,11 +834,19 @@ function updateAnatImages(handles)
     if zoomedAnat
         anatSlice = anatSlice(spanUDAnat,spanLRAnat);
     end
+    
+    if get(handles.ShowPlanesRadio,'Value') && handles.anatDatasets(datasetNum).sliceDim~=3
+        imshow(anatSlice,[]);
+        for i=1:numel(handles.flow)
+            pcRow = handles.flow(i).planeLineRow;
+            anatSlice(pcRow,:) = max(max(anatSlice))+100;
+            hold on; plot(1:size(anatSlice,1),pcRow.*ones(1,size(anatSlice,2)),'y');
+        end 
+    else 
+       imshow(anatSlice,[]); 
+    end 
 
-    axes(handles.AnatomicalPlot); %show image
-    imshow(anatSlice,[]);
-
- 
+    
 % --- Calculate derivative   
 function fPrime = derivative(f)
     f(end+1) = f(1);
@@ -886,6 +931,7 @@ function flow = organizeFlowInfo(handles)
         end 
     end 
 
+    
 % --- Turn PolyLine into SplineLine    
 function [Y,lengthPolyLine] = interppolygon(X,N)
     if nargin < 2 || N < 2
@@ -910,3 +956,107 @@ function [Y,lengthPolyLine] = interppolygon(X,N)
     end
     
     lengthPolyLine = sum(sqrt(delta_X));
+    
+    
+% --- Plot Velocities    
+function plotVelocity(handles)
+    global interpType showErrorBars
+    cla(handles.VelocityPlot,'reset')
+    axes(handles.VelocityPlot);
+    
+    legendSet = {'Baseline',handles.flow.Name};
+    count = length(legendSet)-1;
+    times = handles.flow(1).Data.times;
+    
+    plot(times, zeros(1,length(times)) ,'Color','black','LineWidth',1.5);
+    for i=1:count
+        switch interpType
+            case 'None'
+                flow = handles.flow(i).Data.meanROI;
+                stdev = handles.flow(i).Data.stdROI;
+            case 'Makima'
+                times = handles.flow(i).Makima.times;
+                flow = handles.flow(i).Makima.meanROI;
+                stdev = handles.flow(i).Makima.stdROI;
+            case 'PCHIP'
+                times = handles.flow(i).PCHIP.times;
+                flow = handles.flow(i).PCHIP.meanROI;  
+                stdev = handles.flow(i).PCHIP.stdROI;
+            case 'Spline'
+                times = handles.flow(i).Spline.times;
+                flow = handles.flow(i).Spline.meanROI; 
+                stdev = handles.flow(i).Spline.stdROI;
+            otherwise
+        end
+        
+        if mean(flow)<0
+            if showErrorBars
+                hold on; errorbar(times,-1*flow,stdev);
+            else
+                hold on; plot(times,-1*flow);
+            end 
+        else 
+            if showErrorBars
+                hold on; errorbar(times,flow,stdev);
+            else
+                hold on; plot(times,flow);
+            end
+        end 
+    end 
+    legend(legendSet); hold off
+    xlabel('Time (ms)'); ylabel('Mean Velocity in ROI (mm/s)');
+    xlim([times(1),times(end)]);
+    
+    
+% --- Turn images indices into physical positions (in 3D space)
+% function[truePositions,rotationMatrix] = getTruePosition(info,sliceNum)
+%     if isfield(info,'ImageOrientationPatient') % if dicom
+%         originShift = [info.ImagePositionPatient;1]; % origin is top left corner of image
+%         xres = info.PixelSpacing(1);
+%         yres = info.PixelSpacing(2);
+%         zres = info.SliceThickness;
+%         matrixx = info.Width;
+%         matrixy = info.Height;
+%         
+%         % sometimes get extremely small values that should be 0, so round
+%         xVector = round(info.ImageOrientationPatient(1:3),8); % what direction rows run w/r/to x
+%         yVector = round(info.ImageOrientationPatient(4:6),8); % what direction the cols run w/r/to y
+%         zVector = [cross(xVector,yVector);0];
+%         
+%         xVector = [xVector;0];
+%         yVector = [yVector;0];
+%         rotationMatrix = [xres*xVector yres*yVector zres*zVector originShift]; % turn these vectors into matrices
+%     else 
+%         sx = info.sx;
+%         sy = info.sy;
+%         sz = info.sz;
+%         originShift = [sx;sy;sz;1];
+%         
+%         matrixx = info.matrixx;
+%         matrixy = info.matrixy;
+%         
+%         ix = info.ix;
+%         iy = info.iy;
+%         iz = info.iz;
+%         jx = info.jx;
+%         jy = info.jy;
+%         jz = info.jz;
+%         kx = info.kx;
+%         ky = info.ky;
+%         kz = info.kz;
+%         
+%         xVector = round([ix;iy;iz;0],8); % what direction rows run w/r/to x
+%         yVector = round([jx;jy;jz;0],8); % what direction the cols run w/r/to y
+%         zVector = round([kx;ky;kz;0],8); % what direction the cols run w/r/to y
+%         rotationMatrix = [xVector yVector zVector originShift]; % turn these vectors into matrices
+%     end 
+%     
+%     truePositions = zeros(matrixx,matrixy,3);
+%     for i=1:matrixx
+%         for j=1:matrixy
+%             arrayPosition = double([i;j;sliceNum;1]);
+%             thisPosition = rotationMatrix*arrayPosition;
+%             thisPosition(4) = []; % remove dummy dimension
+%             truePositions(i,j,:) = thisPosition;
+%         end 
+%     end  
