@@ -105,6 +105,7 @@ function varargout = AnalyzePWV_OutputFcn(hObject, eventdata, handles)
 
 
     
+   
     
 %%%%%%%%%%%% LOAD 2DPC PLANE %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -211,7 +212,6 @@ function DrawROIbutton_Callback(hObject, eventdata, handles)
     set(handles.PlanePopup,'Enable','off');
     set(handles.ZoomButton,'Enable','off');
     set(handles.UnzoomButton,'Enable','off');
-    set(handles.PlaneSlider,'Enable','off');
     
     planeNum = get(handles.PlanePopup,'Value');
     if isempty(handles.pcDatasets(planeNum).ROI)
@@ -444,9 +444,7 @@ function CompleteLoadingROI_Callback(hObject, eventdata, handles)
     for i=1:numel(handles.flow)
         handles.flow(i).zLocs = zLocs(i);
     end 
-    guidata(hObject,handles);
-    
-    
+   
     for i =1:numel(handles.anatDatasets)
         images = handles.anatDatasets(i).Data;
         dims(1) = size(images,1);
@@ -479,19 +477,7 @@ function CompleteLoadingROI_Callback(hObject, eventdata, handles)
         spanZ(2) = backBottomRight(3);
         handles.anatDatasets(i).spanZ = spanZ;
     end   
-    
-    datasetNum = get(handles.AnatListbox,'Value');
-    anatRotation = handles.anatDatasets(datasetNum).rotationMatrix;
-    colsRunningDir = sign(nonzeros(anatRotation(:,3)));
-    spanZ = handles.anatDatasets(datasetNum).spanZ;
-    for i=1:numel(handles.flow)
-        planeLinePhysical = colsRunningDir*(handles.flow(i).zLocs-spanZ(1));
-        planeLineRow = round(planeLinePhysical/yres);
-        handles.flow(i).planeLineRow = planeLineRow;
-        guidata(hObject,handles);
-    end 
     guidata(hObject,handles);
-    
     
     
     
@@ -537,6 +523,8 @@ end
 plotVelocity(handles)
     
  
+
+
 
 %%%%%%%%%%%% ANATOMICAL PLANE %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -624,6 +612,19 @@ function DrawCenterlineButton_Callback(hObject, eventdata, handles)
     set(handles.UnzoomAnatomicalButton,'Enable','off');
     set(handles.ShowPlanesRadio,'Value',1);
     ShowPlanesRadio_Callback(hObject, eventdata, handles);
+    
+    datasetNum = get(handles.AnatListbox,'Value');
+    yres = handles.anatDatasets(datasetNum).Info.PixelSpacing(2);
+    anatRotation = handles.anatDatasets(datasetNum).rotationMatrix;
+    colsRunningDir = sign(nonzeros(anatRotation(:,3)));
+    spanZ = handles.anatDatasets(datasetNum).spanZ;
+    for i=1:numel(handles.flow)
+        planeLinePhysical = colsRunningDir*(handles.flow(i).zLocs-spanZ(1));
+        planeLineRow = round(planeLinePhysical/yres);
+        handles.flow(i).planeLineRow = planeLineRow;
+        guidata(hObject,handles);
+    end 
+    guidata(hObject,handles);
 
     datasetNum = get(handles.AnatListbox,'Value');
     if isempty(handles.anatDatasets(datasetNum).Centerline)
@@ -649,17 +650,28 @@ function DrawCenterlineButton_Callback(hObject, eventdata, handles)
                       end
            end
         end
-        [splinePositions,lineLength] = interppolygon(line.Position,100);
-        line.Position = splinePositions;
- 
-        if isfield(handles.anatDatasets(datasetNum).Info,'matrixx')
-            matrixx = handles.anatDatasets(datasetNum).Info.matrixx;
-            fovx = handles.anatDatasets(datasetNum).Info.fovx;
-            xres = fovx/matrixx;
-        else 
-            xres = handles.anatDatasets(datasetNum).Info.PixelSpacing(1);
-        end
-    handles.anatDatasets(datasetNum).Length = lineLength.*xres;
+        
+    splinePositions = interppolygon(line.Position,100);
+    line.Position = splinePositions;
+    
+    if isfield(handles.anatDatasets(datasetNum).Info,'matrixx')
+        matrixx = handles.anatDatasets(datasetNum).Info.matrixx;
+        fovx = handles.anatDatasets(datasetNum).Info.fovx;
+        xres = fovx/matrixx;
+        matrixy = handles.anatDatasets(datasetNum).Info.matrixy;
+        fovy = handles.anatDatasets(datasetNum).Info.fovy;
+        yres = fovy/matrixy;
+    else 
+        xres = handles.anatDatasets(datasetNum).Info.PixelSpacing(1);
+        yres = handles.anatDatasets(datasetNum).Info.PixelSpacing(2);
+    end
+
+    distances = zeros(1,length(splinePositions)-1);
+    for i=1:length(splinePositions)-1
+        distances(i) = sqrt( xres.*(splinePositions(i,1)-splinePositions(i+1,1)).^2 + yres.*(splinePositions(i,2)-splinePositions(i+1,2)).^2 );
+    end 
+    distances(end+1)=0;
+    handles.anatDatasets(datasetNum).Distances = distances;
     handles.anatDatasets(datasetNum).Centerline = line;
     
     guidata(hObject,handles);
@@ -674,6 +686,7 @@ function DeleteCenterlineButton_Callback(hObject, eventdata, handles)
     
     datasetNum = get(handles.AnatListbox,'Value');
     handles.anatDatasets(datasetNum).Centerline = [];
+    handles.anatDatasets(datasetNum).Length = [];
 
     set(handles.ShowPlanesRadio,'Enable','on');
     set(handles.DrawROIbutton,'Enable','on');
@@ -692,10 +705,6 @@ function DeleteCenterlineButton_Callback(hObject, eventdata, handles)
 % --- COMPUTE PWV - CALLBACK
 function ComputePWVButton_Callback(hObject, eventdata, handles)
     
-    line = [handles.anatDatasets.Length];
-    centerline = [handles.anatDatasets.Centerline];
-    planeRows = [handles.flow.planeLineRow];
-    
     set(handles.DrawROIbutton,'Enable','off');
     set(handles.DeleteCenterlineButton,'Enable','off');
     set(handles.ShowPlanesRadio,'Enable','on');
@@ -703,9 +712,50 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
     set(handles.ZoomAnatomicalButton,'Enable','on');
     set(handles.UnzoomAnatomicalButton,'Enable','on');
     set(handles.SliderAnatomical,'Enable','on');
+
+    distances = [handles.anatDatasets.Distances];
+    centerline = [handles.anatDatasets.Centerline];
+    planeRows = [handles.flow.planeLineRow];
+    y = centerline.Position(:,2);
+    
+    difference = ones(length(y),1);
+    for i=1:length(planeRows)
+        difference = difference.*(y-planeRows(i));
+    end 
+    minima = islocalmin(abs(difference));
+    
+    if y(1)-planeRows(1)<0
+        minima(1) = 1;
+    end 
+    
+    if y(end)-planeRows(end)<0
+        minima(end) = 1;
+    end 
+    roiIdxAlongLine = nonzeros(minima.*(1:length(y))');
+    
+    numROIs = numel(handles.flow);  
+    allROIs = 1:numROIs;
+    for i=1:numROIs
+        ROIs2compare = allROIs ~= i;
+        ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
+        distances2ROIs = [NaN,NaN,NaN];
+        for j=1:length(ROIs2compare)
+            iterator = ROIs2compare(j);
+            if iterator>i
+                idx1 = roiIdxAlongLine(i);
+                idx2 = roiIdxAlongLine(iterator);
+                dist = sum(distances(idx1:idx2));
+                distances2ROIs(iterator) = dist;
+            end 
+        end 
+        handles.flow(i).Distance = distances2ROIs;
+    end 
+   guidata(hObject,handles);
+  TTs = computeTTs(handles.flow);
    
 
 
+    
 
 %%%%%%%%%%%% PWV PLOT %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -850,52 +900,64 @@ function fPrime = derivative(f)
     fPrime = diff(f);
     
     
-% --- TTP - time to peak calculation
-function ttp = computeTTP(flow)
+% --- "Time to" calculations (TTP,TTU,TTF,Xcorr)
+function TTs = computeTTs(flow)
     numROIs = numel(flow);
     for i=1:numROIs
-        if mean(flow(i).Data.flowROI)<0
-            flow(i).Data.flowROI = -1*flow(i).Data.flowROI;
+        if mean(flow(i).Data.meanROI)<0
+            flows(i,:) = -1*flow(i).Data.meanROI;
+        else 
+            flows(i,:) = flow(i).Data.meanROI;
         end 
-        [~,idx] = max(flow(i).Data.flowROI);
-        ttp(i).maxFlowIdx = idx;     
+        timeres = flow(i).Data.times(1);
+        [~,maxPeakVelIdx] = max(flows(i,:));
+        TTs(i).maxPeakVelIdx = maxPeakVelIdx;     
     end 
     
-    timeres = flow(i).Data.times(1);
+    %TTP - time to peak calculation
     allROIs = 1:numROIs;
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
-        comparer = [NaN,NaN,NaN];
+        TTP = [NaN,NaN,NaN];
         for j=1:length(ROIs2compare)
             iterator = ROIs2compare(j);
-            if iterator>1
-                comparer(iterator) = timeres.*( ttp(iterator).maxFlowIdx - ttp(i).maxFlowIdx );
+            if iterator>i
+                TTP(iterator) = timeres.*( TTs(iterator).maxPeakVelIdx - TTs(i).maxPeakVelIdx );
             end 
         end 
-        ttp(i).deltaT = comparer;
-    end 
-
+        TTs(i).TTP = TTP;
+    end      
     
-% --- TTF - time to foot calculation
-function ttf = computeTTF(flow)
-    numROIs = numel(flow);
+    %TTU - time to upstroke calculation
     for i=1:numROIs
-        if mean(flow(i).Data.flowROI)<0
-            flow(i).Data.flowROI = -1*flow(i).Data.flowROI;
+        ROIs2compare = allROIs ~= i;
+        ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
+        TTU = [NaN,NaN,NaN];
+        for j=1:length(ROIs2compare)
+            iterator = ROIs2compare(j);
+            if iterator>i
+                TTU(iterator) = 0;
+            end 
         end 
-        
-    end 
-
+        TTs(i).TTU = TTU;
+    end   
     
-% --- TTU - time to upstroke calculation    
-function ttu = computeTTU(flow)
-    numROIs = numel(flow);
+    %XCorr - cross correlation calculation
     for i=1:numROIs
-        if mean(flow(i).Data.flowROI)<0
-            flow(i).Data.flowROI = -1*flow(i).Data.flowROI;
+        ROIs2compare = allROIs ~= i;
+        ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
+        Xcorr = [NaN,NaN,NaN];
+        for j=1:length(ROIs2compare)
+            iterator = ROIs2compare(j);
+            if iterator>i
+                XcorrPlot = xcorr(flows(i),flows(iterator));
+                [~,maxXcorrIdx] = max(XcorrPlot);
+                shift = maxXCorrIdx - length(flows);
+                Xcorr(iterator) = shift.*timeres;
+            end 
         end 
-        
+        TTs(i).Xcorr = Xcorr;
     end 
 
     
@@ -930,7 +992,7 @@ function flow = organizeFlowInfo(handles)
 
     
 % --- Turn PolyLine into SplineLine    
-function [Y,lengthPolyLine] = interppolygon(X,N)
+function Y = interppolygon(X,N)
     if nargin < 2 || N < 2
         N = 2;
     end

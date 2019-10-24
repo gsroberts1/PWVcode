@@ -699,13 +699,7 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
     x = centerline.Position(:,1);
     y = centerline.Position(:,2);
     
-    difference = x-planeRows(1);
-    if difference(1)<0
-        firstZero = find(abs(difference)<1);
-    else
-        firstZero = differences(1);
-        secondZero = find(abs(difference)<1);
-    end 
+
        
 
     set(handles.DrawROIbutton,'Enable','off');
