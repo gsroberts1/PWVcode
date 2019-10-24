@@ -1119,3 +1119,18 @@ function plotVelocity(handles)
 %             truePositions(i,j,:) = thisPosition;
 %         end 
 %     end  
+function [paramEstim,curvature] = sigFit(meanROI,times)
+[~,idxx] = max(meanROI);
+upslope = meanROI(1:idxx);
+times = times(1:idxx);
+
+timeres = times(1);
+
+%c1 = b, c2 = a, c3 = x0, c4 = dx
+sigmoidModel = @(c) c(1) + ( (c(2)-c(1)) ) ./ ( 1+exp((times-c(3))./c(4)) ) - upslope;
+c0 = [max(upslope),min(upslope),idxx*timeres/2,timeres/2];
+paramEstim = lsqnonlin(sigmoidModel,c0);
+
+for i=2:length(meanROI)-1
+    curvature(i) = 4*timeres*(meanROI(i+1)-2*meanROI(i)+meanROI(i-1)) ./ (timeres^2 + ((meanROI(i+1)-meanROI(i-1))/2)^2 ).^(3/2);
+end 
