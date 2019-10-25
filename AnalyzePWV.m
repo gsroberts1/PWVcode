@@ -58,7 +58,7 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     guidata(hObject, handles);
 
     global zoomed zoomedAnat spanUD spanLR spanUDAnat spanLRAnat
-    global  interpType showErrorBars
+    global  interpType showErrorBars startAnalyzing
     
     handles.anatDatasets = varargin{1};
     handles.pcDatasets = varargin{2};
@@ -78,6 +78,7 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     spanLRAnat = [0,0];
     interpType = 'None';
     showErrorBars = 0;
+    startAnalyzing = 0;
     
     set(handles.PlanePopup,'String',{handles.pcDatasets.Names});
     set(handles.DatasetPopup,'String',fieldnames(handles.pcDatasets(1).Data));
@@ -718,7 +719,9 @@ function DeleteCenterlineButton_Callback(hObject, eventdata, handles)
     
 % --- COMPUTE PWV - CALLBACK
 function ComputePWVButton_Callback(hObject, eventdata, handles)
+    global startAnalyzing
     
+    startAnalyzing = 1;
     set(handles.DrawROIbutton,'Enable','off');
     set(handles.DeleteCenterlineButton,'Enable','off');
     set(handles.ShowPlanesRadio,'Enable','on');
@@ -914,32 +917,49 @@ function fPrime = derivative(f)
     
 % --- "Time to" calculations (TTPeak, TTPoint, TTUpstroke, TTFoot, Xcorr)
 function TTs = computeTTs(flow)
+    global startAnalyzing interpType
+    
     numROIs = numel(flow);
     for i=1:numROIs
-        if mean(flow(i).Data.meanROI)<0
-            flows(i,:) = -1*flow(i).Data.meanROI;
-        else 
-            flows(i,:) = flow(i).Data.meanROI;
+        if startAnalyzing
+            switch interpType
+                case 'None'
+                    flowTemp = flow(i).Data.meanROI;
+                case 'Makima'
+                    flowTemp = flow(i).Makima.meanROI;
+                case 'Gaussian'
+                    flowTemp = flow(i).Gaussian.meanROI;  
+                case 'Spline'
+                    flowTemp = flow(i).Spline.meanROI; 
+                otherwise
+            end 
+        else
+            flowTemp = flow(i).Data.meanROI;
         end 
-        timeres = flow(i).Data.times(2)-flow(i).Data.times(1);
-        [maxPeakVel,maxPeakVelIdx] = max(flows(i,:));
-        [TenPoint,TenPointIdx] = min(abs(flows(i,:)-0.1*maxPeakVel));
-        [TwentyPoint,TwentyPointIdx] = min(abs(flows(i,:)-0.2*maxPeakVel));
-        [ThirtyPoint,ThirtyPointIdx] = min(abs(flows(i,:)-0.3*maxPeakVel));
-        [FiftyPoint,FiftyPointIdx] = min(abs(flows(i,:)-0.5*maxPeakVel));
-        [EightyPoint,EightyPointIdx] = min(abs(flows(i,:)-0.8*maxPeakVel));
+        
+        if mean(flowTemp)<0
+            flowTemp = -1*flowTemp;
+        else 
+            flowTemp = flowTemp;
+        end 
+        flowTemp = normalize(flowTemp,'range');
+        
+        times = flow(i).Data.times;
+        timeres = times(2)-times(1);
+        [maxPeakVel,maxPeakVelIdx] = max(flowTemp);
+        upstroke = flowTemp(1:maxPeakVelIdx);
+        [~,EightyPointIdx] = min(abs(upstroke-0.8*maxPeakVel));
+        [~,FiftyPointIdx] = min(abs(upstroke-0.5*maxPeakVel));
+        [~,TwentyPointIdx] = min(abs(upstroke-0.2*maxPeakVel));
         curvePoints(i).maxPeakVelIdx = maxPeakVelIdx;   
-        curvePoints(i).maxPeakVel = maxPeakVel;
-        curvePoints(i).TenPointIdx = TenPointIdx;
-        curvePoints(i).TenPoint = TenPoint;
-        curvePoints(i).TwentyPointIdx = TwentyPointIdx;
-        curvePoints(i).TwentyPoint = TwentyPoint;
-        curvePoints(i).ThirtyPointIdx = ThirtyPointIdx;
-        curvePoints(i).ThirtyPoint = ThirtyPoint;
-        curvePoints(i).FiftyPointIdx = FiftyPointIdx;
-        curvePoints(i).FiftyPoint = FiftyPoint;
+        curvePoints(i).maxPeakVel = maxPeakVel;        
         curvePoints(i).EightyPointIdx = EightyPointIdx;
-        curvePoints(i).EightyPoint = EightyPoint;
+        curvePoints(i).EightyPoint = flowTemp(1:EightyPointIdx);
+        curvePoints(i).FiftyPointIdx = FiftyPointIdx;
+        curvePoints(i).FiftyPoint = flowTemp(1:FiftyPointIdx);
+        curvePoints(i).TwentyPointIdx = TwentyPointIdx;
+        curvePoints(i).TwentyPoint = flowTemp(1:TwentyPointIdx);
+        flows(i,:) = flowTemp;
     end 
     
     %% TTPeak - time to peak calculation
@@ -958,7 +978,6 @@ function TTs = computeTTs(flow)
     end      
     
     %% TTPoint - time to point calculation
-    allROIs = 1:numROIs;
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
@@ -977,7 +996,7 @@ function TTs = computeTTs(flow)
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
         TTUpstroke = [NaN,NaN,NaN];
-        [estimParams,curvature,t1,t2] = sigFit(flows(i));
+        [estimParams,curvature,t1,t2] = sigFit(flows(i,:),times);
         for j=1:length(ROIs2compare)
             iterator = ROIs2compare(j);
             if iterator>i
@@ -996,8 +1015,13 @@ function TTs = computeTTs(flow)
         for j=1:length(ROIs2compare)
             iterator = ROIs2compare(j);
             if iterator>i
+                % m = (y2-y1)/(x2-x1); y1=80%max flow and y2=20%max flow
+                % x1 and x2 are the times (indices) where these values occur
                 m1 = (curvePoints(i).EightyPoint-curvePoints(i).TwentyPoint)/(curvePoints(i).EightPointIdx-curvePoints(i).TwentyPointIdx);
+                % t1 is the x-intercept of this line. 
+                % This can be solved analytically; b = x1-y1/m
                 t1 = curvePoints(i).TwentyPointIdx - (curvePoints(i).TwentyPoint/m);
+                % Do the same for the consequent flow curve
                 m2 = (curvePoints(iterator).EightyPoint-curvePoints(iterator).TwentyPoint)/(curvePoints(iterator).EightPointIdx-curvePoints(iterator).TwentyPointIdx);
                 t2 = curvePoints(iterator).TwentyPointIdx - (curvePoints(iterator).TwentyPoint/m);
                 TTFoot(iterator) = timeres.*(t2-t1);
@@ -1012,6 +1036,7 @@ function TTs = computeTTs(flow)
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
         Xcorr = [NaN,NaN,NaN];
         for j=1:length(ROIs2compare)
+            flows(i) = normalize(flows(i),'range');
             iterator = ROIs2compare(j);
             if iterator>i
                 XcorrPlot = xcorr(flows(i),flows(iterator));
@@ -1182,20 +1207,27 @@ function plotVelocity(handles)
 %         end 
 %     end 
 
-function [paramEstim,curvature,t1,t2] = sigFit(meanROI,times)
-[t2,idxx] = max(meanROI);
-upslope = meanROI(1:idxx);
-times = times(1:idxx);
+function [c,curvature,t1,t2] = sigFit(meanROI,times)
+[~,t2] = max(meanROI);
+upslope = meanROI(1:(t2+1));
+times = times(1:(t2+1));
 
-timeres = times(1);
+timeres = times(2)-times(1);
 
 %c1 = b, c2 = a, c3 = x0, c4 = dx
 sigmoidModel = @(c) c(1) + ( (c(2)-c(1)) ) ./ ( 1+exp((times-c(3))./c(4)) ) - upslope;
-c0 = [max(upslope),min(upslope),idxx*timeres/2,timeres/2];
-paramEstim = lsqnonlin(sigmoidModel,c0);
+c0 = [max(upslope),min(upslope),t2*timeres/2,timeres/2];
+c = lsqnonlin(sigmoidModel,c0);
+sigmoid = c(1) + ( (c(2)-c(1)) ) ./ ( 1+exp((times-c(3))./c(4)) );
 
-for i=2:length(meanROI)-1
-    curvature(i) = 4*timeres*(meanROI(i+1)-2*meanROI(i)+meanROI(i-1)) ./ (timeres^2 + ((meanROI(i+1)-meanROI(i-1))/2)^2 ).^(3/2);
+for i=2:numel(upslope)-1
+    dt = 0.5*(times(i+1)-times(i-1));
+    ddt = 4*(times(i+1)-2*times(i)+times(i-1));
+    dy = 0.5*(sigmoid(i+1)-sigmoid(i-1));
+    ddy = 4*(sigmoid(i+1)-2*sigmoid(i)+sigmoid(i-1));
+    curvature(i) = (ddy*dt - ddt*dy)./((dt^2 + dy^2).^(3/2));
 end 
 
 [~,t1] = max(curvature);
+t1 = t1*timeres;
+t2 = t2+1*timeres;
