@@ -68,7 +68,7 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     handles.anatDatasets(1).Centerline = [];
     handles.pcDatasets(1).ROIdata = [];
     handles.pcDatasets(1).ROIdataMakima = [];
-    handles.pcDatasets(1).ROIdataPCHIP = [];
+    handles.pcDatasets(1).ROIdataGaussian = [];
     handles.pcDatasets(1).ROIdataSpline = [];
     zoomed = 0;
     zoomedAnat = 0;
@@ -81,7 +81,7 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     
     set(handles.PlanePopup,'String',{handles.pcDatasets.Names});
     set(handles.DatasetPopup,'String',fieldnames(handles.pcDatasets(1).Data));
-    set(handles.InterpolatePopup,'String',{'None','Makima','PCHIP','Spline'});
+    set(handles.InterpolatePopup,'String',{'None','Makima','Gaussian','Spline'});
     set(handles.AnatListbox,'String',{handles.anatDatasets.Names});
     set(handles.InterpolatePopup,'Enable','off');
     if numel(handles.magDatasets)==0
@@ -244,7 +244,6 @@ function DrawROIbutton_Callback(hObject, eventdata, handles)
         handles.magDatasets(planeNum).ROI = circle;
     end 
     
-    
     guidata(hObject,handles);
     updateImages(handles);
     else
@@ -255,16 +254,15 @@ function DrawROIbutton_Callback(hObject, eventdata, handles)
 % --- DELETE ROI BUTTON - CALLBACK
 function DeleteROIbutton_Callback(hObject, eventdata, handles)
    axes(handles.PlanePlot)
-   
     hold off
+    
     planeNum = get(handles.PlanePopup,'Value');
     if get(handles.PCRadio,'Value')
         handles.pcDatasets(planeNum).ROI = [];
     else 
         handles.magDatasets(planeNum).ROI = [];
     end 
-    guidata(hObject,handles);
-    updateImages(handles);
+
     set(handles.DrawROIbutton,'Enable','on');
     set(handles.PlanePopup,'Enable','on');
         if get(handles.PCRadio,'Value')
@@ -275,6 +273,8 @@ function DeleteROIbutton_Callback(hObject, eventdata, handles)
     set(handles.ZoomButton,'Enable','on');
     set(handles.UnzoomButton,'Enable','on');
 
+    guidata(hObject,handles);
+    updateImages(handles);
     
 % --- LOAD ROI BUTTON - CALLBACK
 function LoadROIbutton_Callback(hObject, eventdata, handles)
@@ -295,7 +295,23 @@ function LoadROIbutton_Callback(hObject, eventdata, handles)
         Y = Y-center(1);
         roiMask = sqrt(X.^2+Y.^2)<=radius;
 
-        %%% Create Uninterpolated Data
+        %%% Create Linear Interpolated Data
+        t = 1:size(v,3);
+        tq = 1:0.25:size(v,3);
+        
+        if isfield(handles.pcDatasets(planeNum).Info,'matrixx')
+            matrixx = handles.pcDatasets(planeNum).Info.matrixx;
+            fovx = handles.pcDatasets(planeNum).Info.fovx;
+            xres = fovx/matrixx;
+            timeres = handles.pcDatasets(planeNum).Info.timeres;
+        else 
+            xres = handles.pcDatasets(planeNum).Info.PixelSpacing(1);
+            bpm = handles.pcDatasets(planeNum).Info.HeartRate;
+            frames = handles.pcDatasets(planeNum).Info.CardiacNumberOfImages;
+            rrInterval = (60*1000)/bpm;
+            timeres = rrInterval/frames;
+        end 
+        
         for i=1:size(v,3)
             vTemp = v(:,:,i);
             roiDataRaw(:,i) = vTemp(roiMask);
@@ -304,33 +320,32 @@ function LoadROIbutton_Callback(hObject, eventdata, handles)
             maxROI(i) = max(vTemp(roiMask));
             minROI(i) = min(vTemp(roiMask));
             stdROI(i) = std(vTemp(roiMask));
-            if isfield(handles.pcDatasets(planeNum).Info,'matrixx')
-                matrixx = handles.pcDatasets(planeNum).Info.matrixx;
-                fovx = handles.pcDatasets(planeNum).Info.fovx;
-                xres = fovx/matrixx;
-                timeres = handles.pcDatasets(planeNum).Info.timeres;
-            else 
-                xres = handles.pcDatasets(planeNum).Info.PixelSpacing(1);
-                bpm = handles.pcDatasets(planeNum).Info.HeartRate;
-                frames = handles.pcDatasets(planeNum).Info.CardiacNumberOfImages;
-                rrInterval = (60*1000)/bpm;
-                timeres = rrInterval/frames;
-            end 
             area = sum(roiMask(:))*(xres)^2;
             flowROI(i) = area.*meanROI(i);
         end 
-        times = timeres.*(1:length(flowROI));
         dFlow = abs(derivative(flowROI));
         dMean = abs(derivative(meanROI));
+        
+        times = timeres.*(1:length(flowROI));
+        timesInterp = timeres.*tq;
+        meanROIfit = interp1(times,meanROI,timesInterp,'linear');
+        medianROIfit = interp1(times,medianROI,timesInterp,'linear');
+        maxROIfit = interp1(times,maxROI,timesInterp,'linear');
+        minROIfit = interp1(times,minROI,timesInterp,'linear');
+        stdROIfit = interp1(times,stdROI,timesInterp,'linear');
+        flowROIfit = interp1(times,flowROI,timesInterp,'linear');
+        dFlowfit = interp1(times,dFlow,timesInterp,'linear');
+        dMeanfit = interp1(times,dMean,timesInterp,'linear');
+        
 
         roiStatistics.radius = radius; roiStatistics.center = center;
         roiStatistics.roiMask = roiMask; roiStatistics.roiDataRaw = roiDataRaw;
-        roiStatistics.times = times;
-        roiStatistics.meanROI = meanROI; roiStatistics.dMean = dMean;
-        roiStatistics.medianROI = medianROI;
-        roiStatistics.maxROI = maxROI; roiStatistics.minROI = minROI;
-        roiStatistics.stdROI = stdROI;
-        roiStatistics.flowROI = flowROI; roiStatistics.dFlow = dFlow;
+        roiStatistics.times = timesInterp;
+        roiStatistics.meanROI = meanROIfit; roiStatistics.dMean = dMeanfit;
+        roiStatistics.medianROI = medianROIfit;
+        roiStatistics.maxROI = maxROIfit; roiStatistics.minROI = minROIfit;
+        roiStatistics.stdROI = stdROIfit;
+        roiStatistics.flowROI = flowROIfit; roiStatistics.dFlow = dFlowfit;
 
         if isstruct(handles.pcDatasets(planeNum).ROIdata)
             handles.pcDatasets(planeNum).ROIdata(end+1) = roiStatistics;
@@ -339,19 +354,16 @@ function LoadROIbutton_Callback(hObject, eventdata, handles)
         end 
 
         %%% Create Makima Fit
-        t = 1:length(flowROI);
-        tq = 1:0.25:length(flowROI);
-        interpTimes = timeres.*tq;
-        meanROIfit = interp1(t,meanROI,tq,'makima');
-        medianROIfit = interp1(t,medianROI,tq,'makima');
-        maxROIfit = interp1(t,maxROI,tq,'makima');
-        minROIfit = interp1(t,minROI,tq,'makima');
-        stdROIfit = interp1(t,stdROI,tq,'makima');
-        flowROIfit = interp1(t,flowROI,tq,'makima');
-        dFlowfit = interp1(t,dFlow,tq,'makima');
-        dMeanfit = interp1(t,dMean,tq,'makima');
+        meanROIfit = interp1(times,meanROI,timesInterp,'makima');
+        medianROIfit = interp1(times,medianROI,timesInterp,'makima');
+        maxROIfit = interp1(times,maxROI,timesInterp,'makima');
+        minROIfit = interp1(times,minROI,timesInterp,'makima');
+        stdROIfit = interp1(times,stdROI,timesInterp,'makima');
+        flowROIfit = interp1(times,flowROI,timesInterp,'makima');
+        dFlowfit = interp1(times,dFlow,timesInterp,'makima');
+        dMeanfit = interp1(times,dMean,timesInterp,'makima');
 
-        roiStatisticsMakima.times = interpTimes;
+        roiStatisticsMakima.times = timesInterp;
         roiStatisticsMakima.meanROI = meanROIfit; roiStatisticsMakima.dMean = dMeanfit;
         roiStatisticsMakima.medianROI = medianROIfit;
         roiStatisticsMakima.maxROI = maxROIfit; roiStatisticsMakima.minROI = minROIfit;
@@ -364,40 +376,42 @@ function LoadROIbutton_Callback(hObject, eventdata, handles)
             handles.pcDatasets(planeNum).ROIdataMakima = roiStatisticsMakima;
         end 
 
-        %%% Create Piecewise Cubic Hermite Polynomial (PCHIP) Fit            
-        meanROIfit = interp1(t,meanROI,tq,'pchip');
-        medianROIfit = interp1(t,medianROI,tq,'pchip');
-        maxROIfit = interp1(t,maxROI,tq,'pchip');
-        minROIfit = interp1(t,minROI,tq,'pchip');
-        stdROIfit = interp1(t,stdROI,tq,'pchip');
-        flowROIfit = interp1(t,flowROI,tq,'pchip');
-        dFlowfit = interp1(t,dFlow,tq,'pchip');
-        dMeanfit = interp1(t,dMean,tq,'pchip');
+        %%% Create Interpolated Curve with Gaussian Smoothing           
+        meanROIfit = interp1(times,smoothdata(meanROI,'gaussian',5),timesInterp,'linear');
+        medianROIfit = interp1(times,smoothdata(medianROI,'gaussian',5),timesInterp,'linear');
+        maxROIfit = interp1(times,smoothdata(maxROI,'gaussian',5),timesInterp,'linear');
+        minROIfit = interp1(times,smoothdata(minROI,'gaussian',5),timesInterp,'linear');
+        stdROIfit = interp1(times,smoothdata(stdROI,'gaussian',5),timesInterp,'linear');
+        flowROIfit = interp1(times,smoothdata(flowROI,'gaussian',5),timesInterp,'linear');
+        dFlowfit = interp1(times,smoothdata(dFlow,'gaussian',5),timesInterp,'linear');
+        dMeanfit = interp1(times,smoothdata(dMean,'gaussian',5),timesInterp,'linear');
 
-        roiStatisticsPCHIP.times = interpTimes;
-        roiStatisticsPCHIP.meanROI = meanROIfit; roiStatisticsPCHIP.dMean = dMeanfit;
-        roiStatisticsPCHIP.medianROI = medianROIfit;
-        roiStatisticsPCHIP.maxROI = maxROIfit; roiStatisticsPCHIP.minROI = minROIfit;
-        roiStatisticsPCHIP.stdROI = stdROIfit;
-        roiStatisticsPCHIP.flowROI = flowROIfit; roiStatisticsPCHIP.dFlow = dFlowfit;
+        roiStatisticsGaussian.radius = radius; roiStatisticsGaussian.center = center;
+        roiStatisticsGaussian.roiMask = roiMask; roiStatisticsGaussian.roiDataRaw = roiDataRaw;
+        roiStatisticsGaussian.times = timesInterp;
+        roiStatisticsGaussian.meanROI = meanROIfit; roiStatisticsGaussian.dMean = dMeanfit;
+        roiStatisticsGaussian.medianROI = medianROIfit;
+        roiStatisticsGaussian.maxROI = maxROIfit; roiStatisticsGaussian.minROI = minROIfit;
+        roiStatisticsGaussian.stdROI = stdROIfit;
+        roiStatisticsGaussian.flowROI = flowROIfit; roiStatisticsGaussian.dFlow = dFlowfit;
 
-        if isstruct(handles.pcDatasets(planeNum).ROIdataPCHIP)
-            handles.pcDatasets(planeNum).ROIdataPCHIP(end+1) = roiStatisticsPCHIP;
+        if isstruct(handles.pcDatasets(planeNum).ROIdataGaussian)
+            handles.pcDatasets(planeNum).ROIdataGaussian(end+1) = roiStatisticsGaussian;
         else 
-            handles.pcDatasets(planeNum).ROIdataPCHIP = roiStatisticsPCHIP;
+            handles.pcDatasets(planeNum).ROIdataGaussian = roiStatisticsGaussian;
         end 
 
-        %%% Create Cubic Spline Fit        
-        meanROIfit = interp1(t,meanROI,tq,'spline');
-        medianROIfit = interp1(t,medianROI,tq,'spline');
-        maxROIfit = interp1(t,maxROI,tq,'spline');
-        minROIfit = interp1(t,minROI,tq,'spline');
-        stdROIfit = interp1(t,stdROI,tq,'spline');
-        flowROIfit = interp1(t,flowROI,tq,'spline');
-        dFlowfit = interp1(t,dFlow,tq,'spline');
-        dMeanfit = interp1(t,dMean,tq,'spline');
+        %%% Create Cubic Spline Fit   
+        meanROIfit = csaps([0 times times(end)+times(1)],[0 meanROI 0],0.0001,timesInterp);
+        medianROIfit = csaps([0 times times(end)+times(1)],[0 medianROI 0],0.0001,timesInterp);
+        maxROIfit = csaps([0 times times(end)+times(1)],[0 maxROI 0],0.0001,timesInterp);
+        minROIfit = csaps([0 times times(end)+times(1)],[0 minROI 0],0.0001,timesInterp);
+        stdROIfit = csaps([0 times times(end)+times(1)],[0 stdROI 0],0.0001,timesInterp);
+        flowROIfit = csaps([0 times times(end)+times(1)],[0 flowROI 0],0.0001,timesInterp);
+        dFlowfit = csaps([0 times times(end)+times(1)],[0 dFlow 0],0.0001,timesInterp);
+        dMeanfit = csaps([0 times times(end)+times(1)],[0 dMean 0],0.0001,timesInterp);
 
-        roiStatisticsSpline.times = interpTimes;
+        roiStatisticsSpline.times = timesInterp;
         roiStatisticsSpline.meanROI = meanROIfit; roiStatisticsSpline.dMean = dMeanfit;
         roiStatisticsSpline.medianROI = medianROIfit;
         roiStatisticsSpline.maxROI = maxROIfit; roiStatisticsSpline.minROI = minROIfit;
@@ -420,8 +434,8 @@ function LoadROIbutton_Callback(hObject, eventdata, handles)
     handles.flow = organizeFlowInfo(handles);
     plotVelocity(handles);
     
-    clear times interpTimes area count i 
-    clear roiStatistics roiStatisticsMakima roiStatisticsPCHIP roiStatisticsSpline
+    clear times timesInterp area count i 
+    clear roiStatistics roiStatisticsMakima roiStatisticsGaussian roiStatisticsSpline
     set(handles.InterpolatePopup,'Enable','on');
 
     guidata(hObject,handles);
@@ -481,6 +495,7 @@ function CompleteLoadingROI_Callback(hObject, eventdata, handles)
     
     
     
+    
 %%%%%%%%%%%% VELOCITY PLOT %%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % --- VELOCITY PLOT - CREATE FUNCTION
@@ -498,7 +513,7 @@ function InterpolatePopup_Callback(hObject, eventdata, handles)
         case 2 
             interpType = 'Makima';
         case 3 
-            interpType = 'PCHIP';
+            interpType = 'Gaussian';
         case 4
             interpType = 'Spline';
         otherwise
@@ -523,7 +538,6 @@ end
 plotVelocity(handles)
     
  
-
 
 
 %%%%%%%%%%%% ANATOMICAL PLANE %%%%%%%%%%%%
@@ -755,8 +769,7 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
    
 
 
-    
-
+   
 %%%%%%%%%%%% PWV PLOT %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 % --- PWV PLOT - CREATE FUNCTION
@@ -804,9 +817,8 @@ function averageData_CreateFcn(hObject, eventdata, handles)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
 
 % --- Update Images in PLANE PLOT
-function varargout = updateImages(varargin)
+function varargout = updateImages(handles)
     global spanUD spanLR zoomed 
-    handles = varargin{1};
     axes(handles.PlanePlot);
     
     planeNum = get(handles.PlanePopup,'Value');
@@ -833,7 +845,7 @@ function varargout = updateImages(varargin)
     end 
 
     if ndims(images)<3
-        steps = [1 1];
+        steps = [1 500];
         set(handles.PlaneSlider, 'SliderStep', steps);
         slice = images;
     else
@@ -900,7 +912,7 @@ function fPrime = derivative(f)
     fPrime = diff(f);
     
     
-% --- "Time to" calculations (TTP,TTU,TTF,Xcorr)
+% --- "Time to" calculations (TTPeak, TTPoint, TTUpstroke, TTFoot, Xcorr)
 function TTs = computeTTs(flow)
     numROIs = numel(flow);
     for i=1:numROIs
@@ -909,41 +921,92 @@ function TTs = computeTTs(flow)
         else 
             flows(i,:) = flow(i).Data.meanROI;
         end 
-        timeres = flow(i).Data.times(1);
-        [~,maxPeakVelIdx] = max(flows(i,:));
-        TTs(i).maxPeakVelIdx = maxPeakVelIdx;     
+        timeres = flow(i).Data.times(2)-flow(i).Data.times(1);
+        [maxPeakVel,maxPeakVelIdx] = max(flows(i,:));
+        [TenPoint,TenPointIdx] = min(abs(flows(i,:)-0.1*maxPeakVel));
+        [TwentyPoint,TwentyPointIdx] = min(abs(flows(i,:)-0.2*maxPeakVel));
+        [ThirtyPoint,ThirtyPointIdx] = min(abs(flows(i,:)-0.3*maxPeakVel));
+        [FiftyPoint,FiftyPointIdx] = min(abs(flows(i,:)-0.5*maxPeakVel));
+        [EightyPoint,EightyPointIdx] = min(abs(flows(i,:)-0.8*maxPeakVel));
+        curvePoints(i).maxPeakVelIdx = maxPeakVelIdx;   
+        curvePoints(i).maxPeakVel = maxPeakVel;
+        curvePoints(i).TenPointIdx = TenPointIdx;
+        curvePoints(i).TenPoint = TenPoint;
+        curvePoints(i).TwentyPointIdx = TwentyPointIdx;
+        curvePoints(i).TwentyPoint = TwentyPoint;
+        curvePoints(i).ThirtyPointIdx = ThirtyPointIdx;
+        curvePoints(i).ThirtyPoint = ThirtyPoint;
+        curvePoints(i).FiftyPointIdx = FiftyPointIdx;
+        curvePoints(i).FiftyPoint = FiftyPoint;
+        curvePoints(i).EightyPointIdx = EightyPointIdx;
+        curvePoints(i).EightyPoint = EightyPoint;
     end 
     
-    %TTP - time to peak calculation
+    %% TTPeak - time to peak calculation
     allROIs = 1:numROIs;
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
-        TTP = [NaN,NaN,NaN];
+        TTPeak = [NaN,NaN,NaN];
         for j=1:length(ROIs2compare)
             iterator = ROIs2compare(j);
             if iterator>i
-                TTP(iterator) = timeres.*( TTs(iterator).maxPeakVelIdx - TTs(i).maxPeakVelIdx );
+                TTPeak(iterator) = timeres.*( curvePoints(iterator).maxPeakVelIdx - curvePoints(i).maxPeakVelIdx );
             end 
         end 
-        TTs(i).TTP = TTP;
+        TTs(i).TTPeak = TTPeak;
     end      
     
-    %TTU - time to upstroke calculation
+    %% TTPoint - time to point calculation
+    allROIs = 1:numROIs;
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
-        TTU = [NaN,NaN,NaN];
+        TTPoint = [NaN,NaN,NaN];
         for j=1:length(ROIs2compare)
             iterator = ROIs2compare(j);
             if iterator>i
-                TTU(iterator) = 0;
+                TTPoint(iterator) = timeres.*( curvePoints(iterator).FiftyPointIdx - curvePoints(i).FiftyPointIdx );
             end 
         end 
-        TTs(i).TTU = TTU;
+        TTs(i).TTPoint = TTPoint;
+    end    
+    
+    %% TTUpstroke - time to upstroke calculation
+    for i=1:numROIs
+        ROIs2compare = allROIs ~= i;
+        ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
+        TTUpstroke = [NaN,NaN,NaN];
+        [estimParams,curvature,t1,t2] = sigFit(flows(i));
+        for j=1:length(ROIs2compare)
+            iterator = ROIs2compare(j);
+            if iterator>i
+                
+                TTUpstroke(iterator) = 0;
+            end 
+        end 
+        TTs(i).TTUpstroke = TTUpstroke;
     end   
     
-    %XCorr - cross correlation calculation
+    %% TTFoot - time to foot calculation
+    for i=1:numROIs
+        ROIs2compare = allROIs ~= i;
+        ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
+        TTFoot = [NaN,NaN,NaN];
+        for j=1:length(ROIs2compare)
+            iterator = ROIs2compare(j);
+            if iterator>i
+                m1 = (curvePoints(i).EightyPoint-curvePoints(i).TwentyPoint)/(curvePoints(i).EightPointIdx-curvePoints(i).TwentyPointIdx);
+                t1 = curvePoints(i).TwentyPointIdx - (curvePoints(i).TwentyPoint/m);
+                m2 = (curvePoints(iterator).EightyPoint-curvePoints(iterator).TwentyPoint)/(curvePoints(iterator).EightPointIdx-curvePoints(iterator).TwentyPointIdx);
+                t2 = curvePoints(iterator).TwentyPointIdx - (curvePoints(iterator).TwentyPoint/m);
+                TTFoot(iterator) = timeres.*(t2-t1);
+            end 
+        end 
+        TTs(i).TTFoot = TTFoot;
+    end 
+    
+    %% XCorr - cross correlation calculation
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
@@ -971,7 +1034,7 @@ function flow = organizeFlowInfo(handles)
                 flow(count).Data = handles.pcDatasets(i).ROIdata;
                 flow(count).Info = handles.pcDatasets(i).Info;
                 flow(count).Makima = handles.pcDatasets(i).ROIdataMakima;
-                flow(count).PCHIP = handles.pcDatasets(i).ROIdataPCHIP;
+                flow(count).Gaussian = handles.pcDatasets(i).ROIdataGaussian;
                 flow(count).Spline = handles.pcDatasets(i).ROIdataSpline;
                 count = count+1;
             else 
@@ -982,7 +1045,7 @@ function flow = organizeFlowInfo(handles)
                     flow(count).Data = handles.pcDatasets(i).ROIdata(j);
                     flow(count).Info = handles.pcDatasets(i).Info;
                     flow(count).Makima = handles.pcDatasets(i).ROIdataMakima(j);
-                    flow(count).PCHIP = handles.pcDatasets(i).ROIdataPCHIP(j);
+                    flow(count).Gaussian = handles.pcDatasets(i).ROIdataGaussian(j);
                     flow(count).Spline = handles.pcDatasets(i).ROIdataSpline(j);
                     count = count+1;
                 end 
@@ -1037,10 +1100,10 @@ function plotVelocity(handles)
                 times = handles.flow(i).Makima.times;
                 flow = handles.flow(i).Makima.meanROI;
                 stdev = handles.flow(i).Makima.stdROI;
-            case 'PCHIP'
-                times = handles.flow(i).PCHIP.times;
-                flow = handles.flow(i).PCHIP.meanROI;  
-                stdev = handles.flow(i).PCHIP.stdROI;
+            case 'Gaussian'
+                times = handles.flow(i).Gaussian.times;
+                flow = handles.flow(i).Gaussian.meanROI;  
+                stdev = handles.flow(i).Gaussian.stdROI;
             case 'Spline'
                 times = handles.flow(i).Spline.times;
                 flow = handles.flow(i).Spline.meanROI; 
@@ -1065,7 +1128,6 @@ function plotVelocity(handles)
     legend(legendSet); hold off
     xlabel('Time (ms)'); ylabel('Mean Velocity in ROI (mm/s)');
     xlim([times(1),times(end)]);
-    
     
 % --- Turn images indices into physical positions (in 3D space)
 % function[truePositions,rotationMatrix] = getTruePosition(info,sliceNum)
@@ -1118,9 +1180,10 @@ function plotVelocity(handles)
 %             thisPosition(4) = []; % remove dummy dimension
 %             truePositions(i,j,:) = thisPosition;
 %         end 
-%     end  
-function [paramEstim,curvature] = sigFit(meanROI,times)
-[~,idxx] = max(meanROI);
+%     end 
+
+function [paramEstim,curvature,t1,t2] = sigFit(meanROI,times)
+[t2,idxx] = max(meanROI);
 upslope = meanROI(1:idxx);
 times = times(1:idxx);
 
@@ -1134,3 +1197,5 @@ paramEstim = lsqnonlin(sigmoidModel,c0);
 for i=2:length(meanROI)-1
     curvature(i) = 4*timeres*(meanROI(i+1)-2*meanROI(i)+meanROI(i-1)) ./ (timeres^2 + ((meanROI(i+1)-meanROI(i-1))/2)^2 ).^(3/2);
 end 
+
+[~,t1] = max(curvature);
