@@ -22,7 +22,7 @@ function varargout = AnalyzePWV(varargin)
 
     % Edit the above text to modify the response to help AnalyzePWV
 
-    % Last Modified by GUIDE v2.5 22-Oct-2019 17:23:01
+    % Last Modified by GUIDE v2.5 25-Oct-2019 17:48:53
 
     % Begin initialization code - DO NOT EDIT
     gui_Singleton = 1;
@@ -95,6 +95,11 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     set(handles.DeleteCenterlineButton,'Enable','off');
     set(handles.ComputePWVButton,'Enable','off');
     set(handles.ShowPlanesRadio,'Enable','off')
+    set(handles.ttpRadio,'Value',1);
+    set(handles.ttpointRadio,'Value',1);
+    set(handles.ttuRadio,'Value',1);
+    set(handles.ttfRadio,'Value',1);
+    set(handles.xcorrRadio,'Value',1);
         
     guidata(hObject, handles);
     updateImages(handles);
@@ -157,6 +162,7 @@ function PlanePopup_Callback(hObject, eventdata, handles)
         set(handles.DatasetPopup,'String',fieldnames(handles.pcDatasets(planeNum).Data));
     end 
     set(handles.DatasetPopup,'Value',1);
+    clear planeNum
     updateImages(handles);
 
 % --- PLANE DROPDOWN - CREATE FUNCTION
@@ -188,6 +194,8 @@ function ZoomButton_Callback(hObject, eventdata, handles)
     spanUD = spanUD(1)+positions(2):(spanUD(1)+positions(2)+positions(4));
     spanLR = spanLR(1)+positions(1):(spanLR(1)+positions(1)+positions(3));
     zoomed = 1;
+    
+    clear rect positions
     updateImages(handles);
  
     
@@ -245,6 +253,7 @@ function DrawROIbutton_Callback(hObject, eventdata, handles)
         handles.magDatasets(planeNum).ROI = circle;
     end 
     
+    clear planeNum mydlg w key
     guidata(hObject,handles);
     updateImages(handles);
     else
@@ -274,6 +283,7 @@ function DeleteROIbutton_Callback(hObject, eventdata, handles)
     set(handles.ZoomButton,'Enable','on');
     set(handles.UnzoomButton,'Enable','on');
 
+    clear planeNum 
     guidata(hObject,handles);
     updateImages(handles);
     
@@ -429,16 +439,15 @@ function LoadROIbutton_Callback(hObject, eventdata, handles)
         clear roiDataRaw meanROI medianROI maxROI minROI stdROI flowROI  
         clear dFlowfit dMeanfit circle matrixx t tq vTemp X Y xres i fovx
         clear meanROIfit medianROIfit maxROIfit minROIfit stdROIfit flowROIfit  
+        clear roiStatistics roiStatisticsMakima roiStatisticsGaussian roiStatisticsSpline
+        clear times timesInterp
     end 
 
     %%% Plot Curves
     handles.flow = organizeFlowInfo(handles);
     plotVelocity(handles);
-    
-    clear times timesInterp area count i 
-    clear roiStatistics roiStatisticsMakima roiStatisticsGaussian roiStatisticsSpline
-    set(handles.InterpolatePopup,'Enable','on');
 
+    set(handles.InterpolatePopup,'Enable','on');
     guidata(hObject,handles);
     DeleteROIbutton_Callback(hObject, eventdata, handles);
     updateImages(handles);
@@ -446,55 +455,60 @@ function LoadROIbutton_Callback(hObject, eventdata, handles)
     
 % --- COMPLETE LOADING BUTTON - CALLBACK
 function CompleteLoadingROI_Callback(hObject, eventdata, handles)
-    set(handles.DeleteROIbutton,'Enable','off');
-    set(handles.LoadROIbutton,'Enable','off');
-    
-    set(handles.DrawCenterlineButton,'Enable','on');
-    set(handles.ShowPlanesRadio,'Enable','on');
-    set(handles.ZoomAnatomicalButton,'Enable','on');
-    set(handles.UnzoomAnatomicalButton,'Enable','on');
-    
-    zLocs = EnterZslices(handles.flow);
-    
-    for i=1:numel(handles.flow)
-        handles.flow(i).zLocs = zLocs(i);
+    if isfield(handles,'flow') && numel(handles.flow)>1
+        set(handles.DeleteROIbutton,'Enable','off');
+        set(handles.LoadROIbutton,'Enable','off');
+
+        set(handles.DrawCenterlineButton,'Enable','on');
+        set(handles.ShowPlanesRadio,'Enable','on');
+        set(handles.ZoomAnatomicalButton,'Enable','on');
+        set(handles.UnzoomAnatomicalButton,'Enable','on');
+
+        zLocs = EnterZslices(handles.flow);
+
+        for i=1:numel(handles.flow)
+            handles.flow(i).zLocs = zLocs(i);
+        end 
+
+        for i =1:numel(handles.anatDatasets)
+            images = handles.anatDatasets(i).Data;
+            dims(1) = size(images,1);
+            dims(2) = size(images,2);
+            dims(3) = size(images,3);
+            handles.anatDatasets(i).dims = dims;
+
+            originShift = [handles.anatDatasets(i).Info.ImagePositionPatient;1]; % origin is top left corner of image
+            xres = handles.anatDatasets(i).Info.PixelSpacing(1);
+            yres = handles.anatDatasets(i).Info.PixelSpacing(2);
+            zres = handles.anatDatasets(i).Info.SliceThickness;
+
+            % sometimes get extremely small values that should be 0, so round
+            xVector = round( handles.anatDatasets(i).Info.ImageOrientationPatient(1:3) ,8); % what direction rows run w/r/to x
+            yVector = round( handles.anatDatasets(i).Info.ImageOrientationPatient(4:6) ,8); % what direction the cols run w/r/to y
+            zVector = [cross(xVector,yVector);0];
+            xVector = [xVector;0];
+            yVector = [yVector;0];
+            rotationMatrix = [xres*xVector yres*yVector zres*zVector originShift];
+            sliceDim = find(rotationMatrix(:,3));
+            handles.anatDatasets(i).rotationMatrix = rotationMatrix;     
+            handles.anatDatasets(i).sliceDim = sliceDim;
+
+
+            topFrontLeft = rotationMatrix*[1;1;1;1];
+            topFrontLeft(4) = []; % remove dummy dimension
+            backBottomRight = rotationMatrix*[dims(1);dims(2);dims(3);1];
+            backBottomRight(4) = [];
+            spanZ(1) = topFrontLeft(3);
+            spanZ(2) = backBottomRight(3);
+            handles.anatDatasets(i).spanZ = spanZ;
+        end   
+
+        clear backBottomRight dims i images originShift rotationMatrix sliceDim
+        clear spanZ zLocs topFrontLeft xres xVector yres yVector zres zVector
+        guidata(hObject,handles);
+    else
+        set(handles.MessageBar,'String','You need at least 2 ROIs for PWV measurements.');
     end 
-   
-    for i =1:numel(handles.anatDatasets)
-        images = handles.anatDatasets(i).Data;
-        dims(1) = size(images,1);
-        dims(2) = size(images,2);
-        dims(3) = size(images,3);
-        handles.anatDatasets(i).dims = dims;
-
-        originShift = [handles.anatDatasets(i).Info.ImagePositionPatient;1]; % origin is top left corner of image
-        xres = handles.anatDatasets(i).Info.PixelSpacing(1);
-        yres = handles.anatDatasets(i).Info.PixelSpacing(2);
-        zres = handles.anatDatasets(i).Info.SliceThickness;
-        
-        % sometimes get extremely small values that should be 0, so round
-        xVector = round( handles.anatDatasets(i).Info.ImageOrientationPatient(1:3) ,8); % what direction rows run w/r/to x
-        yVector = round( handles.anatDatasets(i).Info.ImageOrientationPatient(4:6) ,8); % what direction the cols run w/r/to y
-        zVector = [cross(xVector,yVector);0];
-        xVector = [xVector;0];
-        yVector = [yVector;0];
-        rotationMatrix = [xres*xVector yres*yVector zres*zVector originShift];
-        sliceDim = find(rotationMatrix(:,3));
-        handles.anatDatasets(i).rotationMatrix = rotationMatrix;     
-        handles.anatDatasets(i).sliceDim = sliceDim;
-
-        
-        topFrontLeft = rotationMatrix*[1;1;1;1];
-        topFrontLeft(4) = []; % remove dummy dimension
-        backBottomRight = rotationMatrix*[dims(1);dims(2);dims(3);1];
-        backBottomRight(4) = [];
-        spanZ(1) = topFrontLeft(3);
-        spanZ(2) = backBottomRight(3);
-        handles.anatDatasets(i).spanZ = spanZ;
-    end   
-    guidata(hObject,handles);
-    
-    
     
     
 %%%%%%%%%%%% VELOCITY PLOT %%%%%%%%%%%%%%
@@ -520,6 +534,7 @@ function InterpolatePopup_Callback(hObject, eventdata, handles)
         otherwise
     end 
     
+    clear interp
     plotVelocity(handles)
 
 % --- INTERPOLATE POPUP - CREATE FUNCTION
@@ -528,15 +543,16 @@ function InterpolatePopup_CreateFcn(hObject, eventdata, handles)
         set(hObject,'BackgroundColor','white');
     end
     
-  % --- Executes on button press in ErrorBarRadio.
+% --- ERROR BAR RADIO - CALLBACK
 function ErrorBarRadio_Callback(hObject, eventdata, handles)
-global showErrorBars
-if get(handles.ErrorBarRadio,'Value')
-    showErrorBars = 1;
-else 
-    showErrorBars = 0;
-end 
-plotVelocity(handles)
+    global showErrorBars
+    if get(handles.ErrorBarRadio,'Value')
+        showErrorBars = 1;
+    else 
+        showErrorBars = 0;
+    end 
+
+    plotVelocity(handles)
     
  
 
@@ -586,6 +602,8 @@ function ShowPlanesRadio_Callback(hObject, eventdata, handles)
         end 
     end 
     
+    clear i datasetNum yres anatRotation colsRunningDir spanZ 
+    clear planeLinePhysical planeLineRow
     updateAnatImages(handles);
     guidata(hObject,handles);
     
@@ -600,6 +618,8 @@ function ZoomAnatomicalButton_Callback(hObject, eventdata, handles)
     spanUDAnat = spanUDAnat(1)+positions(2):(spanUDAnat(1)+positions(2)+positions(4));
     spanLRAnat = spanLRAnat(1)+positions(1):(spanLRAnat(1)+positions(1)+positions(3));
     zoomedAnat = 1;
+    
+    clear rect positions 
     updateAnatImages(handles);
     
     
@@ -639,7 +659,6 @@ function DrawCenterlineButton_Callback(hObject, eventdata, handles)
         handles.flow(i).planeLineRow = planeLineRow;
         guidata(hObject,handles);
     end 
-    guidata(hObject,handles);
 
     datasetNum = get(handles.AnatListbox,'Value');
     if isempty(handles.anatDatasets(datasetNum).Centerline)
@@ -689,6 +708,9 @@ function DrawCenterlineButton_Callback(hObject, eventdata, handles)
     handles.anatDatasets(datasetNum).Distances = distances;
     handles.anatDatasets(datasetNum).Centerline = line;
     
+    clear datasetNum yres anatRotation colsRunningDir spanZ i w mydlg 
+    clear key planeLinePhysical planeLineRow matrixx fovx xres matrixy 
+    clear fovy yres distances splinePositions
     guidata(hObject,handles);
     updateImages(handles);
     else
@@ -711,11 +733,12 @@ function DeleteCenterlineButton_Callback(hObject, eventdata, handles)
     set(handles.SliderAnatomical,'Enable','on');
     set(handles.ShowPlanesRadio,'Value',0);
     
+    
+    clear datasetNum
     hold off
     guidata(hObject,handles);
     updateAnatImages(handles);
-    
-    
+   
     
 % --- COMPUTE PWV - CALLBACK
 function ComputePWVButton_Callback(hObject, eventdata, handles)
@@ -767,9 +790,228 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
         end 
         handles.flow(i).Distance = distances2ROIs;
     end 
-   guidata(hObject,handles);
-  TTs = computeTTs(handles.flow);
-   
+    
+    guidata(hObject,handles);
+    TTs = computeTTs(handles.flow);
+  
+    distance = []; TTPeak = []; TTPoint = []; TTFoot = []; TTUpstroke = []; Xcorr = [];
+    for i = 1:numel(handles.flow)
+        mask = ~isnan(handles.flow(i).Distance);
+        distance = [distance handles.flow(i).Distance(mask)];
+        TTPeak = [TTPeak TTs(i).TTPeak(mask)];
+        TTPoint = [TTPoint TTs(i).TTPoint(mask)];
+        TTFoot = [TTFoot TTs(i).TTFoot(mask)];
+        TTUpstroke = [TTUpstroke TTs(i).TTUpstroke(mask)];
+        Xcorr = [Xcorr TTs(i).Xcorr(mask)];
+    end
+    
+    if numel(distance)==1
+        set(handles.distanceHeader1,'String',' Plane 1 --> 2');
+        set(handles.distance1,'String',[num2str(round(distance(1),1)) ' mm']); 
+    elseif numel(distance)==3
+        set(handles.distanceHeader1,'String',' Plane 1 --> 2');
+        set(handles.distance1,'String',[num2str(round(distance(1),1)) ' mm']); 
+        set(handles.distanceHeader2,'String',' Plane 1 --> 3');
+        set(handles.distance2,'String',[num2str(round(distance(2),1)) ' mm']); 
+        set(handles.distanceHeader3,'String',' Plane 2 --> 3');
+        set(handles.distance3,'String',[num2str(round(distance(3),1)) ' mm']);       
+    else
+        set(handles.distanceHeader1,'String',' Plane 1 --> 2');
+        set(handles.distance1,'String',[num2str(round(distance(1),1)) ' mm']); 
+        set(handles.distanceHeader2,'String',' Plane 1 --> 3');
+        set(handles.distance2,'String',[num2str(round(distance(2),1)) ' mm']); 
+        set(handles.distanceHeader3,'String',' Plane 1 --> 4');
+        set(handles.distance3,'String',[num2str(round(distance(3),1)) ' mm']); 
+        set(handles.distanceHeader4,'String',' Plane 2 --> 3');
+        set(handles.distance4,'String',[num2str(round(distance(4),1)) ' mm']);
+        set(handles.distanceHeader5,'String',' Plane 2 --> 4');
+        set(handles.distance5,'String',[num2str(round(distance(5),1)) ' mm']); 
+        set(handles.distanceHeader6,'String',' Plane 3 --> 4');
+        set(handles.distance6,'String',[num2str(round(distance(6),1)) ' mm']);         
+    end 
+    
+    cla(handles.TimeVsDistance,'reset');
+    axes(handles.TimeVsDistance); hold on; 
+    xlabel('Distance (mm)'); ylabel('Time Shift (ms)');
+    sz = 30;
+    
+    numMethods = get(handles.ttpRadio,'Value')+get(handles.ttpointRadio,'Value')...
+    +get(handles.ttfRadio,'Value')+get(handles.ttuRadio,'Value')+get(handles.xcorrRadio,'Value');
+    numCompares = numel(distance);
+    
+    legendSet = {};
+    average = zeros(1,numCompares);
+    if get(handles.ttpRadio,'Value')
+        scatter(distance,TTPeak,sz,'filled','MarkerFaceColor',[0 0.4470 0.7410]);
+        for i=1:numCompares
+            average(i) = average(i)+TTPeak(i);
+        end 
+        legendSet{end+1} = 'TTPeak';
+    end 
+    if get(handles.ttpointRadio,'Value')
+        scatter(distance,TTPoint,sz,'filled','MarkerFaceColor',[0.8500 0.3250 0.0980]);
+        for i=1:numCompares
+            average(i) = average(i)+TTPoint(i);
+        end 
+        legendSet{end+1} = 'TTPoint';
+    end 
+    if get(handles.ttfRadio,'Value')
+        scatter(distance,TTFoot,sz,'filled','MarkerFaceColor',[0.4940 0.1840 0.5560]);
+        for i=1:numCompares
+            average(i) = average(i)+TTFoot(i);
+        end 
+        legendSet{end+1} = 'TTFoot';
+    end 
+    if get(handles.ttuRadio,'Value')
+        scatter(distance,TTUpstroke,sz,'filled','MarkerFaceColor',[0.4660 0.6740 0.1880]);
+        for i=1:numCompares
+            average(i) = average(i)+TTUpstroke(i);
+        end 
+        legendSet{end+1} = 'TTUpstroke';
+    end 
+    if get(handles.xcorrRadio,'Value')
+        scatter(distance,Xcorr,sz,'filled','MarkerFaceColor',[0.6350 0.0780 0.1840]);
+        for i=1:numCompares
+            average(i) = average(i)+Xcorr(i);
+        end 
+        legendSet{end+1} = 'XCorr';
+    end 
+
+    average = average/numMethods;
+    scatter(distance,average,40,'black');
+    legendSet{end+1} = 'AVERAGE';
+    
+
+    d = min(distance):max(distance);
+    linePeakFit = polyfit(distance,TTPeak,1);
+    linePeak = linePeakFit(1)*d + linePeakFit(2);
+    linePointFit = polyfit(distance,TTPoint,1);
+    linePoint= linePointFit(1)*d + linePointFit(2);
+    lineFootFit = polyfit(distance,TTFoot,1);
+    lineFoot= lineFootFit(1)*d + lineFootFit(2);
+    lineUpstrokeFit = polyfit(distance,TTUpstroke,1);
+    lineUpstroke = lineUpstrokeFit(1)*d + lineUpstrokeFit(2);
+    lineXcorrFit = polyfit(distance,Xcorr,1);
+    lineXcorr = lineXcorrFit(1)*d + lineXcorrFit(2);
+    lineAverageFit = polyfit(distance,average,1);
+    lineAverage= lineAverageFit(1)*d + lineAverageFit(2);
+    PWVpeak = 1/linePeakFit(1);
+    PWVpoint = 1/linePointFit(1);
+    PWVfoot = 1/lineFootFit(1);
+    PWVupstroke = 1/lineUpstrokeFit(1);
+    PWVxcorr = 1/lineXcorrFit(1);
+    PWVaverage = 1/lineAverageFit(1);
+    
+    hold on; 
+    if get(handles.ttpRadio,'Value')
+        plot(d,linePeak,':','LineWidth',0.2,'MarkerFaceColor',[0 0.4470 0.7410]);
+        set(handles.ttpData,'String',[num2str(round(PWVpeak,2)) ' m/s']);
+    end 
+    if get(handles.ttpointRadio,'Value')
+        plot(d,linePoint,':','LineWidth',0.2,'MarkerFaceColor',[0.8500 0.3250 0.0980]);
+        set(handles.ttpointData,'String',[num2str(round(PWVpoint,2)) ' m/s']);
+    end 
+    if get(handles.ttfRadio,'Value')
+        plot(d,lineFoot,':','LineWidth',0.2,'MarkerFaceColor',[0.4940 0.1840 0.5560]);
+        set(handles.ttfData,'String',[num2str(round(PWVfoot,2)) ' m/s']);
+    end 
+    if get(handles.ttuRadio,'Value')
+        plot(d,lineUpstroke,':','LineWidth',0.2,'MarkerFaceColor',[0.4660 0.6740 0.1880]);
+        set(handles.ttuData,'String',[num2str(round(PWVupstroke,2)) ' m/s']);
+    end 
+    if get(handles.xcorrRadio,'Value')
+        plot(d,lineXcorr,':','LineWidth',0.2,'MarkerFaceColor',[0.6350 0.0780 0.1840]);
+        set(handles.xcorrData,'String',[num2str(round(PWVxcorr,2)) ' m/s']);
+    end 
+    plot(d,lineAverage,'-k','LineWidth',0.2);
+    legend(legendSet,'Location','southeast');
+    hold off;
+    
+    
+    if numMethods>0
+        set(handles.averageData,'String',[num2str(round(PWVaverage,2)) ' m/s']);
+    else 
+        set(handles.averageData,'String','0 m/s');
+    end
+    
+    clear allROIs average centerline d difference dist distance distances distances2ROIs
+    clear i idx idx2 iterator j legendSet lineAverage lineAverageFit idx1
+    clear lineFoot lineFootFit linePeak linePeakFit linePoint linePointFit
+    clear lineUpstroke lineUpstrokeFit lineXcorr lineXcorrFit mask
+    clear minima numCompares numMethods numROIs planeRows PWVaverage PWVfoot 
+    clear PWVpeak PWVpoint PWVupstroke PWVxcorr sz startAnalyzing Xcorr
+    clear TTFoot TTPeak TTPoint TTs TTUpstroke y ROIs2compare roiIdxAlongLine
+    
+% --- COMPLETE RESET BUTTON - CALLBACK
+function resetButton_Callback(hObject, eventdata, handles)
+    mydlg = warndlg('WARNING: Pressing ENTER will completely reset the ROI data. Press ESC to cancel');
+    waitfor(mydlg);
+    while true
+        w = waitforbuttonpress; 
+        switch w 
+            case 1 % (keyboard press) 
+              key = get(gcf,'currentcharacter'); 
+                  switch key
+                      case 27 % 27 is the escape key
+                          set(handles.MessageBar,'String','Complete reset cancelled.');
+                          break % break out of the while loop
+                      case 13 % 13 is the return key 
+                          set(handles.MessageBar,'String','Complete reset initiated.');
+                          break
+                      otherwise 
+                          % Wait for a different command. 
+                  end
+       end
+    end
+
+    global zoomed zoomedAnat spanUD spanLR spanUDAnat spanLRAnat
+    global  interpType showErrorBars startAnalyzing
+    
+    handles.pcDatasets(1).ROI = [];
+    handles.magDatasets(1).ROI = [];
+    handles.anatDatasets(1).Centerline = [];
+    handles.pcDatasets(1).ROIdata = [];
+    handles.pcDatasets(1).ROIdataMakima = [];
+    handles.pcDatasets(1).ROIdataGaussian = [];
+    handles.pcDatasets(1).ROIdataSpline = [];
+    handles.flow = [];
+    zoomed = 0;
+    zoomedAnat = 0;
+    spanUD = [0,0];
+    spanLR = [0,0];
+    spanUDAnat = [0,0];
+    spanLRAnat = [0,0];
+    interpType = 'None';
+    showErrorBars = 0;
+    startAnalyzing = 0;
+    
+    set(handles.PlanePopup,'String',{handles.pcDatasets.Names});
+    set(handles.DatasetPopup,'String',fieldnames(handles.pcDatasets(1).Data));
+    set(handles.InterpolatePopup,'String',{'None','Makima','Gaussian','Spline'});
+    set(handles.AnatListbox,'String',{handles.anatDatasets.Names});
+    set(handles.InterpolatePopup,'Enable','off');
+    if numel(handles.magDatasets)==0
+        set(handles.MAGRadio,'Enable','off')
+    end 
+    
+    set(handles.ShowPlanesRadio,'Enable','off');
+    set(handles.DrawCenterlineButton,'Enable','off');
+    set(handles.DeleteCenterlineButton,'Enable','off');
+    set(handles.DeleteCenterlineButton,'Enable','off');
+    set(handles.ComputePWVButton,'Enable','off');
+    set(handles.ShowPlanesRadio,'Enable','off')
+    set(handles.ttpRadio,'Value',1);
+    set(handles.ttpointRadio,'Value',1);
+    set(handles.ttuRadio,'Value',1);
+    set(handles.ttfRadio,'Value',1);
+    set(handles.xcorrRadio,'Value',1);
+        
+    
+    clear mydlg w key 
+    guidata(hObject, handles);
+    updateImages(handles);
+    updateAnatImages(handles);
+
 
 
    
@@ -779,7 +1021,7 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
 function TimeVsDistance_CreateFcn(hObject, eventdata, handles)
 
 
-% --- Executes on button press in ExportAnalysisButton.
+% --- EXPORT ANALYSIS - CALLBACK
 function ExportAnalysisButton_Callback(hObject, eventdata, handles)
 
 
@@ -793,26 +1035,104 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
 end    
    
 
-% --- TTP READOUT - CREATE FUNCTION
+% --- TTPeak READOUT - CREATE FUNCTION
 function ttpData_CreateFcn(hObject, eventdata, handles)
+% --- TTPeak RADIO - CALLBACK
+function ttpRadio_Callback(hObject, eventdata, handles)
+    global startAnalyzing
+    
+    if ~get(handles.ttpRadio,'Value')
+        set(handles.ttpData,'String',' ');
+    end 
+    if startAnalyzing
+        ComputePWVButton_Callback(hObject, eventdata, handles);
+    end 
 
+% --- TTPoint READOUT - CREATE FUNCTION
+function ttpointData_CreateFcn(hObject, eventdata, handles)
+% --- TTPoint RADIO - CALLBACK
+function ttpointRadio_Callback(hObject, eventdata, handles)
+    global startAnalyzing
+    
+    if ~get(handles.ttpointRadio,'Value')
+        set(handles.ttpointData,'String',' ');
+    end 
+    if startAnalyzing
+        ComputePWVButton_Callback(hObject, eventdata, handles);
+    end 
 
-% --- TTU READOUT - CREATE FUNCTION
+% --- TTUpstroke READOUT - CREATE FUNCTION
 function ttuData_CreateFcn(hObject, eventdata, handles)
+% --- TTUpstroke RADIO - CALLBACK
+function ttuRadio_Callback(hObject, eventdata, handles)
+    global startAnalyzing
+    
+    if ~get(handles.ttuRadio,'Value')
+        set(handles.ttuData,'String',' ');
+    end 
+    if startAnalyzing
+        ComputePWVButton_Callback(hObject, eventdata, handles);
+    end 
 
-
-% --- TTF READOUT - CREATE FUNCTION
+% --- TTFoot READOUT - CREATE FUNCTION
 function ttfData_CreateFcn(hObject, eventdata, handles)
+% --- TTFoot RADIO - CALLBACK
+function ttfRadio_Callback(hObject, eventdata, handles)
+    global startAnalyzing
+    
+    if ~get(handles.ttfRadio,'Value')
+        set(handles.ttfData,'String',' ');
+    end 
+    if startAnalyzing
+        ComputePWVButton_Callback(hObject, eventdata, handles);
+    end 
 
-
-% --- XCORR READOUT - CREATE FUNCTION
+% --- Xcorr READOUT - CREATE FUNCTION
 function xcorrData_CreateFcn(hObject, eventdata, handles)
-
+% --- Xcorr RADIO - CALLBACK
+function xcorrRadio_Callback(hObject, eventdata, handles)
+    global startAnalyzing
+    
+    if ~get(handles.xcorrRadio,'Value')
+        set(handles.xcorrData,'String',' ');
+    end 
+    if startAnalyzing
+        ComputePWVButton_Callback(hObject, eventdata, handles);
+    end 
 
 % --- AVERAGE READOUT - CREATE FUNCTION
 function averageData_CreateFcn(hObject, eventdata, handles)
 
 
+% --- DISTANCE 1 PlANES - CREATE FUNCTION
+function distanceHeader1_CreateFcn(hObject, eventdata, handles)
+% --- DISTANCE 1 - CREATE FUNCTION
+function distance1_CreateFcn(hObject, eventdata, handles)
+
+% --- DISTANCE 2 PlANES - CREATE FUNCTION
+function distanceHeader2_CreateFcn(hObject, eventdata, handles)
+% --- DISTANCE 2 - CREATE FUNCTION
+function distance2_CreateFcn(hObject, eventdata, handles)
+
+% --- DISTANCE 3 PlANES - CREATE FUNCTION
+function distanceHeader3_CreateFcn(hObject, eventdata, handles)
+% --- DISTANCE 3 - CREATE FUNCTION
+function distance3_CreateFcn(hObject, eventdata, handles)
+
+% --- DISTANCE 4 PlANES - CREATE FUNCTION
+function distanceHeader4_CreateFcn(hObject, eventdata, handles)
+% --- DISTANCE 4 - CREATE FUNCTION
+function distance4_CreateFcn(hObject, eventdata, handles)
+
+% --- DISTANCE 5 PlANES - CREATE FUNCTION
+function distanceHeader5_CreateFcn(hObject, eventdata, handles)
+% --- DISTANCE 5 - CREATE FUNCTION
+function distance5_CreateFcn(hObject, eventdata, handles)
+
+% --- DISTANCE 6 PlANES - CREATE FUNCTION
+function distance6_CreateFcn(hObject, eventdata, handles)
+% --- DISTANCE 6 - CREATE FUNCTION
+function distanceHeader6_CreateFcn(hObject, eventdata, handles)
 
 
 
@@ -820,7 +1140,7 @@ function averageData_CreateFcn(hObject, eventdata, handles)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
 
 % --- Update Images in PLANE PLOT
-function varargout = updateImages(handles)
+function updateImages(handles)
     global spanUD spanLR zoomed 
     axes(handles.PlanePlot);
     
@@ -863,8 +1183,6 @@ function varargout = updateImages(handles)
         slice = slice(spanUD,spanLR);
     end 
 
-    varargout{1} = slice;   
-    
     if ~isempty(handles.pcDatasets(planeNum).ROI)
         hold on
         imshow(slice,[]);
@@ -872,6 +1190,7 @@ function varargout = updateImages(handles)
         cla(handles.PlanePlot,'reset')
         imshow(slice,[])
     end 
+    clear dataset datasetNum images imageSet isPC planeNum slice steps 
     
 % --- Update Images in ANATOMICAL PLOT
 function updateAnatImages(handles)
@@ -907,13 +1226,8 @@ function updateAnatImages(handles)
     else 
        imshow(anatSlice,[]); 
     end 
+    clear anatSlice datasetNum dim3size i images pcRow sliceNum spanLRAnat spanUDAnat steps
 
-    
-% --- Calculate derivative   
-function fPrime = derivative(f)
-    f(end+1) = f(1);
-    fPrime = diff(f);
-    
     
 % --- "Time to" calculations (TTPeak, TTPoint, TTUpstroke, TTFoot, Xcorr)
 function TTs = computeTTs(flow)
@@ -954,15 +1268,15 @@ function TTs = computeTTs(flow)
         curvePoints(i).maxPeakVelIdx = maxPeakVelIdx;   
         curvePoints(i).maxPeakVel = maxPeakVel;        
         curvePoints(i).EightyPointIdx = EightyPointIdx;
-        curvePoints(i).EightyPoint = flowTemp(1:EightyPointIdx);
+        curvePoints(i).EightyPoint = flowTemp(EightyPointIdx);
         curvePoints(i).FiftyPointIdx = FiftyPointIdx;
-        curvePoints(i).FiftyPoint = flowTemp(1:FiftyPointIdx);
+        curvePoints(i).FiftyPoint = flowTemp(FiftyPointIdx);
         curvePoints(i).TwentyPointIdx = TwentyPointIdx;
-        curvePoints(i).TwentyPoint = flowTemp(1:TwentyPointIdx);
+        curvePoints(i).TwentyPoint = flowTemp(TwentyPointIdx);
         flows(i,:) = flowTemp;
     end 
     
-    %% TTPeak - time to peak calculation
+    % TTPeak - time to peak calculation
     allROIs = 1:numROIs;
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
@@ -977,7 +1291,7 @@ function TTs = computeTTs(flow)
         TTs(i).TTPeak = TTPeak;
     end      
     
-    %% TTPoint - time to point calculation
+    % TTPoint - time to point calculation
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
@@ -991,23 +1305,24 @@ function TTs = computeTTs(flow)
         TTs(i).TTPoint = TTPoint;
     end    
     
-    %% TTUpstroke - time to upstroke calculation
+    % TTUpstroke - time to upstroke calculation
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
-        TTUpstroke = [NaN,NaN,NaN];
-        [estimParams,curvature,t1,t2] = sigFit(flows(i,:),times);
+        TTUpstroke = [NaN,NaN,NaN];  
+        
         for j=1:length(ROIs2compare)
             iterator = ROIs2compare(j);
             if iterator>i
-                
-                TTUpstroke(iterator) = 0;
+                [sigmoid1,upslope1,~,tUpstroke1,~,timeresSigmoid1] = sigFit(flows(i,:));
+                [sigmoid2,upslope2,~,tUpstroke2,~,timeresSigmoid2] = sigFit(flows(iterator,:));
+                TTUpstroke(iterator) = timeres.*(timeresSigmoid1*tUpstroke2 - timeresSigmoid2*tUpstroke1);
             end 
         end 
         TTs(i).TTUpstroke = TTUpstroke;
     end   
     
-    %% TTFoot - time to foot calculation
+    % TTFoot - time to foot calculation
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
@@ -1017,20 +1332,20 @@ function TTs = computeTTs(flow)
             if iterator>i
                 % m = (y2-y1)/(x2-x1); y1=80%max flow and y2=20%max flow
                 % x1 and x2 are the times (indices) where these values occur
-                m1 = (curvePoints(i).EightyPoint-curvePoints(i).TwentyPoint)/(curvePoints(i).EightPointIdx-curvePoints(i).TwentyPointIdx);
+                m1 = (curvePoints(i).EightyPoint-curvePoints(i).TwentyPoint)/(curvePoints(i).EightyPointIdx-curvePoints(i).TwentyPointIdx);
                 % t1 is the x-intercept of this line. 
                 % This can be solved analytically; b = x1-y1/m
-                t1 = curvePoints(i).TwentyPointIdx - (curvePoints(i).TwentyPoint/m);
+                t1 = curvePoints(i).TwentyPointIdx - (curvePoints(i).TwentyPoint/m1);
                 % Do the same for the consequent flow curve
-                m2 = (curvePoints(iterator).EightyPoint-curvePoints(iterator).TwentyPoint)/(curvePoints(iterator).EightPointIdx-curvePoints(iterator).TwentyPointIdx);
-                t2 = curvePoints(iterator).TwentyPointIdx - (curvePoints(iterator).TwentyPoint/m);
+                m2 = (curvePoints(iterator).EightyPoint-curvePoints(iterator).TwentyPoint)/(curvePoints(iterator).EightyPointIdx-curvePoints(iterator).TwentyPointIdx);
+                t2 = curvePoints(iterator).TwentyPointIdx - (curvePoints(iterator).TwentyPoint/m2);
                 TTFoot(iterator) = timeres.*(t2-t1);
             end 
         end 
         TTs(i).TTFoot = TTFoot;
     end 
     
-    %% XCorr - cross correlation calculation
+    % XCorr - cross correlation calculation
     for i=1:numROIs
         ROIs2compare = allROIs ~= i;
         ROIs2compare = nonzeros(ROIs2compare.*allROIs); 
@@ -1039,9 +1354,9 @@ function TTs = computeTTs(flow)
             flows(i) = normalize(flows(i),'range');
             iterator = ROIs2compare(j);
             if iterator>i
-                XcorrPlot = xcorr(flows(i),flows(iterator));
+                XcorrPlot = xcorr(flows(i,:),flows(iterator,:));
                 [~,maxXcorrIdx] = max(XcorrPlot);
-                shift = maxXCorrIdx - length(flows);
+                shift = -1*(maxXcorrIdx - length(flows(i,:)));
                 Xcorr(iterator) = shift.*timeres;
             end 
         end 
@@ -1154,80 +1469,38 @@ function plotVelocity(handles)
     xlabel('Time (ms)'); ylabel('Mean Velocity in ROI (mm/s)');
     xlim([times(1),times(end)]);
     
-% --- Turn images indices into physical positions (in 3D space)
-% function[truePositions,rotationMatrix] = getTruePosition(info,sliceNum)
-%     if isfield(info,'ImageOrientationPatient') % if dicom
-%         originShift = [info.ImagePositionPatient;1]; % origin is top left corner of image
-%         xres = info.PixelSpacing(1);
-%         yres = info.PixelSpacing(2);
-%         zres = info.SliceThickness;
-%         matrixx = info.Width;
-%         matrixy = info.Height;
-%         
-%         % sometimes get extremely small values that should be 0, so round
-%         xVector = round(info.ImageOrientationPatient(1:3),8); % what direction rows run w/r/to x
-%         yVector = round(info.ImageOrientationPatient(4:6),8); % what direction the cols run w/r/to y
-%         zVector = [cross(xVector,yVector);0];
-%         
-%         xVector = [xVector;0];
-%         yVector = [yVector;0];
-%         rotationMatrix = [xres*xVector yres*yVector zres*zVector originShift]; % turn these vectors into matrices
-%     else 
-%         sx = info.sx;
-%         sy = info.sy;
-%         sz = info.sz;
-%         originShift = [sx;sy;sz;1];
-%         
-%         matrixx = info.matrixx;
-%         matrixy = info.matrixy;
-%         
-%         ix = info.ix;
-%         iy = info.iy;
-%         iz = info.iz;
-%         jx = info.jx;
-%         jy = info.jy;
-%         jz = info.jz;
-%         kx = info.kx;
-%         ky = info.ky;
-%         kz = info.kz;
-%         
-%         xVector = round([ix;iy;iz;0],8); % what direction rows run w/r/to x
-%         yVector = round([jx;jy;jz;0],8); % what direction the cols run w/r/to y
-%         zVector = round([kx;ky;kz;0],8); % what direction the cols run w/r/to y
-%         rotationMatrix = [xVector yVector zVector originShift]; % turn these vectors into matrices
-%     end 
-%     
-%     truePositions = zeros(matrixx,matrixy,3);
-%     for i=1:matrixx
-%         for j=1:matrixy
-%             arrayPosition = double([i;j;sliceNum;1]);
-%             thisPosition = rotationMatrix*arrayPosition;
-%             thisPosition(4) = []; % remove dummy dimension
-%             truePositions(i,j,:) = thisPosition;
-%         end 
-%     end 
 
-function [c,curvature,t1,t2] = sigFit(meanROI,times)
-[~,t2] = max(meanROI);
-upslope = meanROI(1:(t2+1));
-times = times(1:(t2+1));
+% --- Sigmoid Fit Function
+function [sigmoid,upslope,curvature,t1,t2,timeres] = sigFit(meanROI)
+    [~,peak] = max(meanROI);
+    upslope = meanROI(1:peak);
+    t = 1:peak;
+    times = 1:0.1:peak;
+    t2 = length(times);
+    upslope = interp1(t,upslope,times);
+    upslope = normalize(upslope,'range');
 
-timeres = times(2)-times(1);
+    timeres = times(2)-times(1);
 
-%c1 = b, c2 = a, c3 = x0, c4 = dx
-sigmoidModel = @(c) c(1) + ( (c(2)-c(1)) ) ./ ( 1+exp((times-c(3))./c(4)) ) - upslope;
-c0 = [max(upslope),min(upslope),t2*timeres/2,timeres/2];
-c = lsqnonlin(sigmoidModel,c0);
-sigmoid = c(1) + ( (c(2)-c(1)) ) ./ ( 1+exp((times-c(3))./c(4)) );
+    %c1 = b, c2 = a, c3 = x0, c4 = dx
+    sigmoidModel = @(c) c(1) + ( (c(2)-c(1)) ) ./ ( 1+exp((times-c(3))./c(4)) ) - upslope;
+    c0 = [max(upslope),min(upslope),peak/2,timeres/2];
+    opts = optimset('Display', 'off');
+    c = lsqnonlin(sigmoidModel,c0,[],[],opts);
+    sigmoid = c(1) + ( (c(2)-c(1)) ) ./ ( 1+exp((times-c(3))./c(4)) );
 
-for i=2:numel(upslope)-1
-    dt = 0.5*(times(i+1)-times(i-1));
-    ddt = 4*(times(i+1)-2*times(i)+times(i-1));
-    dy = 0.5*(sigmoid(i+1)-sigmoid(i-1));
-    ddy = 4*(sigmoid(i+1)-2*sigmoid(i)+sigmoid(i-1));
-    curvature(i) = (ddy*dt - ddt*dy)./((dt^2 + dy^2).^(3/2));
-end 
+    for i=2:numel(upslope)-1
+        dt = 0.5*(times(i+1)-times(i-1));
+        ddt = 4*(times(i+1)-2*times(i)+times(i-1));
+        dy = 0.5*(sigmoid(i+1)-sigmoid(i-1));
+        ddy = 4*(sigmoid(i+1)-2*sigmoid(i)+sigmoid(i-1));
+        curvature(i) = (ddy*dt - ddt*dy)./((dt^2 + dy^2).^(3/2));
+    end 
 
-[~,t1] = max(curvature);
-t1 = t1*timeres;
-t2 = t2+1*timeres;
+    [~,t1] = max(curvature);
+    
+% --- Calculate derivative   
+function fPrime = derivative(f)
+    f(end+1) = f(1);
+    fPrime = diff(f);
+   
