@@ -60,102 +60,28 @@ function EnterZslices_OpeningFcn(hObject, eventdata, handles, varargin)
             set(handles.slice2edit,'Enable','off');
             set(handles.slice3edit,'Enable','off');
             set(handles.slice4edit,'Enable','off');
-            set(handles.slice5edit,'Enable','off');
-            set(handles.slice6edit,'Enable','off');
-            set(handles.slice7edit,'Enable','off');
-            set(handles.slice8edit,'Enable','off');
             set(handles.slice2text,'Enable','off');
             set(handles.slice3text,'Enable','off');
             set(handles.slice4text,'Enable','off');
-            set(handles.slice5text,'Enable','off');
-            set(handles.slice6text,'Enable','off');
-            set(handles.slice7text,'Enable','off');
-            set(handles.slice8text,'Enable','off');
             set(handles.slice1text,'String',handles.flow(1).Name);
         case 2
             set(handles.slice3edit,'Enable','off');
             set(handles.slice4edit,'Enable','off');
-            set(handles.slice5edit,'Enable','off');
-            set(handles.slice6edit,'Enable','off');
-            set(handles.slice7edit,'Enable','off');
-            set(handles.slice8edit,'Enable','off');
             set(handles.slice3text,'Enable','off');
             set(handles.slice4text,'Enable','off');
-            set(handles.slice5text,'Enable','off');
-            set(handles.slice6text,'Enable','off');
-            set(handles.slice7text,'Enable','off');
-            set(handles.slice8text,'Enable','off');
             set(handles.slice1text,'String',handles.flow(1).Name);
             set(handles.slice2text,'String',handles.flow(2).Name);
         case 3
             set(handles.slice4edit,'Enable','off');
-            set(handles.slice5edit,'Enable','off');
-            set(handles.slice6edit,'Enable','off');
-            set(handles.slice7edit,'Enable','off');
-            set(handles.slice8edit,'Enable','off');
             set(handles.slice4text,'Enable','off');
-            set(handles.slice5text,'Enable','off');
-            set(handles.slice6text,'Enable','off');
-            set(handles.slice7text,'Enable','off');
-            set(handles.slice8text,'Enable','off');
             set(handles.slice1text,'String',handles.flow(1).Name);
             set(handles.slice2text,'String',handles.flow(2).Name);
             set(handles.slice3text,'String',handles.flow(3).Name);
         case 4
-            set(handles.slice5edit,'Enable','off');
-            set(handles.slice6edit,'Enable','off');
-            set(handles.slice7edit,'Enable','off');
-            set(handles.slice8edit,'Enable','off');
-            set(handles.slice5text,'Enable','off');
-            set(handles.slice6text,'Enable','off');
-            set(handles.slice7text,'Enable','off');
-            set(handles.slice8text,'Enable','off');
             set(handles.slice1text,'String',handles.flow(1).Name);
             set(handles.slice2text,'String',handles.flow(2).Name);
             set(handles.slice3text,'String',handles.flow(3).Name);
             set(handles.slice4text,'String',handles.flow(4).Name);
-        case 5
-            set(handles.slice6edit,'Enable','off');
-            set(handles.slice7edit,'Enable','off');
-            set(handles.slice8edit,'Enable','off');
-            set(handles.slice6text,'Enable','off');
-            set(handles.slice7text,'Enable','off');
-            set(handles.slice8text,'Enable','off');
-            set(handles.slice1text,'String',handles.flow(1).Name);
-            set(handles.slice2text,'String',handles.flow(2).Name);
-            set(handles.slice3text,'String',handles.flow(3).Name);
-            set(handles.slice4text,'String',handles.flow(4).Name);
-            set(handles.slice5text,'String',handles.flow(5).Name);       
-        case 6
-            set(handles.slice7edit,'Enable','off');
-            set(handles.slice8edit,'Enable','off');
-            set(handles.slice7text,'Enable','off');
-            set(handles.slice8text,'Enable','off');
-            set(handles.slice1text,'String',handles.flow(1).Name);
-            set(handles.slice2text,'String',handles.flow(2).Name);
-            set(handles.slice3text,'String',handles.flow(3).Name);
-            set(handles.slice4text,'String',handles.flow(4).Name);
-            set(handles.slice5text,'String',handles.flow(5).Name);  
-            set(handles.slice6text,'String',handles.flow(6).Name);  
-        case 7 
-            set(handles.slice8edit,'Enable','off');
-            set(handles.slice8text,'Enable','off');
-            set(handles.slice1text,'String',handles.flow(1).Name);
-            set(handles.slice2text,'String',handles.flow(2).Name);
-            set(handles.slice3text,'String',handles.flow(3).Name);
-            set(handles.slice4text,'String',handles.flow(4).Name);
-            set(handles.slice5text,'String',handles.flow(5).Name);  
-            set(handles.slice6text,'String',handles.flow(6).Name);  
-            set(handles.slice7text,'String',handles.flow(7).Name);          
-        case 8
-            set(handles.slice1text,'String',handles.flow(1).Name);
-            set(handles.slice2text,'String',handles.flow(2).Name);
-            set(handles.slice3text,'String',handles.flow(3).Name);
-            set(handles.slice4text,'String',handles.flow(4).Name);
-            set(handles.slice5text,'String',handles.flow(5).Name);  
-            set(handles.slice6text,'String',handles.flow(6).Name);  
-            set(handles.slice7text,'String',handles.flow(7).Name);  
-            set(handles.slice8text,'String',handles.flow(8).Name);  
         otherwise
     end 
     
@@ -225,52 +151,6 @@ function slice4text_CreateFcn(hObject, eventdata, handles)
 
 
 
-%%% SLICE 5
-function slice5edit_Callback(hObject, eventdata, handles)
-
-function slice5edit_CreateFcn(hObject, eventdata, handles)
-    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-        set(hObject,'BackgroundColor','white');
-    end
-
-function slice5text_CreateFcn(hObject, eventdata, handles)
-
-
-
-%%% SLICE 6
-function slice6edit_Callback(hObject, eventdata, handles)
-
-function slice6edit_CreateFcn(hObject, eventdata, handles)
-    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-        set(hObject,'BackgroundColor','white');
-    end
-
-function slice6text_CreateFcn(hObject, eventdata, handles)
-
-
-
-%%% SLICE 7
-function slice7edit_Callback(hObject, eventdata, handles)
-
-function slice7edit_CreateFcn(hObject, eventdata, handles)
-    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-        set(hObject,'BackgroundColor','white');
-    end
-
-function slice7text_CreateFcn(hObject, eventdata, handles)
-
-
-%%% SLICE 8
-function slice8edit_Callback(hObject, eventdata, handles)
-
-function slice8edit_CreateFcn(hObject, eventdata, handles)
-    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-        set(hObject,'BackgroundColor','white');
-    end
-
-function slice8text_CreateFcn(hObject, eventdata, handles)
-
-
 %%% Complete Loading
 function completeLoadingButton_Callback(hObject, eventdata, handles)
     switch numel(handles.flow)
@@ -288,39 +168,11 @@ function completeLoadingButton_Callback(hObject, eventdata, handles)
             zLocs(2) = str2num(get(handles.slice2edit,'String'));
             zLocs(3) = str2num(get(handles.slice3edit,'String'));
             zLocs(4) = str2num(get(handles.slice4edit,'String'));
-        case 5
-            zLocs(1) = str2num(get(handles.slice1edit,'String'));
-            zLocs(2) = str2num(get(handles.slice2edit,'String'));
-            zLocs(3) = str2num(get(handles.slice3edit,'String'));
-            zLocs(4) = str2num(get(handles.slice4edit,'String'));
-            zLocs(5) = str2num(get(handles.slice5edit,'String'));      
-        case 6
-            zLocs(1) = str2num(get(handles.slice1edit,'String'));
-            zLocs(2) = str2num(get(handles.slice2edit,'String'));
-            zLocs(3) = str2num(get(handles.slice3edit,'String'));
-            zLocs(4) = str2num(get(handles.slice4edit,'String'));
-            zLocs(5) = str2num(get(handles.slice5edit,'String')); 
-            zLocs(6) = str2num(get(handles.slice6edit,'String'));
-        case 7 
-            zLocs(1) = str2num(get(handles.slice1edit,'String'));
-            zLocs(2) = str2num(get(handles.slice2edit,'String'));
-            zLocs(3) = str2num(get(handles.slice3edit,'String'));
-            zLocs(4) = str2num(get(handles.slice4edit,'String'));
-            zLocs(5) = str2num(get(handles.slice5edit,'String'));
-            zLocs(6) = str2num(get(handles.slice6edit,'String'));
-            zLocs(7) = str2num(get(handles.slice7edit,'String'));         
-        case 8
-            zLocs(1) = str2num(get(handles.slice1edit,'String'));
-            zLocs(2) = str2num(get(handles.slice2edit,'String'));
-            zLocs(3) = str2num(get(handles.slice3edit,'String'));
-            zLocs(4) = str2num(get(handles.slice4edit,'String'));
-            zLocs(5) = str2num(get(handles.slice5edit,'String'));
-            zLocs(6) = str2num(get(handles.slice6edit,'String'));
-            zLocs(7) = str2num(get(handles.slice7edit,'String'));
-            zLocs(8) = str2num(get(handles.slice8edit,'String'));
         otherwise
     end 
+    
 handles.zLocs = zLocs;
+clear zLocs
 guidata(hObject,handles);
 close(handles.zLocsGUI);
  

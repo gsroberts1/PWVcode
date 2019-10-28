@@ -22,7 +22,7 @@ function varargout = LoadPWV(varargin)
 
 % Edit the above text to modify the response to help LoadPWV
 
-% Last Modified by GUIDE v2.5 10-Oct-2019 15:08:11
+% Last Modified by GUIDE v2.5 26-Oct-2019 10:49:51
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -73,6 +73,8 @@ function varargout = LoadPWV_OutputFcn(hObject, eventdata, handles)
     varargout{1} = handles.output;
 
 
+    
+    
 %%%%%%%%%%%%%% PRELOAD CASE PANEL %%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % --- PRELOAD CASE CALLBACK
@@ -95,7 +97,9 @@ function PreloadCaseButton_Callback(hObject, eventdata, handles)
     pcDataIter = numel(pcDatasets);
     magDataIter = numel(magDatasets);
     pcviprDataIter = numel(pcviprDatasets);
-    preloaded=1;
+    preloaded = 1;
+    
+    clear casefile casefilDir
 
 
     
@@ -159,6 +163,7 @@ function ButtonLoadAnatomical_Callback(hObject, eventdata, handles)
             set(handles.ListboxAnatomical,'String',{anatDatasets.Names});
         end 
     end 
+    clear name temp data dirInfo extension anatomicalFile anatomicalDir i
 
 % --- BUTTON LOAD ANATOMICAL CREATE FUNCTION
 function ButtonLoadAnatomical_CreateFcn(hObject, eventdata, handles)
@@ -182,9 +187,11 @@ function RemoveAnatomical_Callback(hObject, eventdata, handles)
     set(handles.ListboxAnatomical,'Value',1);
     set(handles.ListboxAnatomical,'String',{anatDatasets.Names});
     anatDataIter = anatDataIter-1;
+    clear index 
 
 % --- REMOVE ANATOMICAL CREATE FUNCTION
 function RemoveAnatomical_CreateFcn(hObject, eventdata, handles)
+
 
 
 
@@ -234,6 +241,7 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
             end   
             data.v = temp(:,:,1:floor(length(dirInfo)/2)); %%maybe change to velocity
             data.mag = temp(:,:,floor(length(dirInfo)/2)+1:end);
+            VMEAN = BGPhaseCorrect(data.mag,data.v);
         else
             fid = fopen([pcDir '\pcvipr_header.txt'], 'r');
             dataArray = textscan(fid, '%s%s%[^\n\r]', 'Delimiter', ' ', 'MultipleDelimsAsOne', true, 'ReturnOnError', false);
@@ -270,6 +278,9 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
     set(handles.DataName2DPC,'String','')
     set(handles.Listbox2DPC,'String',{pcDatasets.Names});
     end 
+    
+    clear name pcFile pcDir cd mag v CD MAG VMEAN resx resy pcviprHeader 
+    clear dataArray nframes dirInfo temp i extension 
 
 % --- BUTTON LOAD 2DPC CREATE FUNCTION
 function ButtonLoad2DPC_CreateFcn(hObject, eventdata, handles)
@@ -293,6 +304,7 @@ function Remove2DPC_Callback(hObject, eventdata, handles)
     set(handles.Listbox2DPC,'Value',1);
     set(handles.Listbox2DPC,'String',{pcDatasets.Names});
     pcDataIter = pcDataIter-1;
+    clear index
 
 % --- REMOVE 2DPC CREATE FUNCTION
 function Remove2DPC_CreateFcn(hObject, eventdata, handles)
@@ -358,8 +370,8 @@ function ButtonLoad2DMAG_Callback(hObject, eventdata, handles)
             set(handles.DataName2DMAG,'String','')
             set(handles.Listbox2DMAG,'String',{magDatasets.Names});
         end 
-        
     end 
+    clear name data temp dirInfo extension magFile magDir i
 
 % --- BUTTON LOAD 2DMAG CREATE FUNCTION
 function ButtonLoad2DMAG_CreateFcn(hObject, eventdata, handles)
@@ -383,6 +395,7 @@ function Remove2DMAG_Callback(hObject, eventdata, handles)
     set(handles.Listbox2DMAG,'Value',1);
     set(handles.Listbox2DMAG,'String',{magDatasets.Names});
     magDataIter = magDataIter-1;
+    clear index 
 
 % --- REMOVE 2DMAG CREATE FUNCTION
 function Remove2DMAG_CreateFcn(hObject, eventdata, handles)
@@ -448,8 +461,8 @@ function ButtonLoad4DFlow_Callback(hObject, eventdata, handles)
             set(handles.DataName4DFlow,'String','')
             set(handles.Listbox4DFlow,'String',{pcviprDatasets.Names});
         end 
-        
     end 
+    clear name pcviprFile pcviprDir extension dirInfo temp data i 
 
 % --- BUTTON LOAD 4D FLOW CREATE FUNCTION
 function ButtonLoad4DFlow_CreateFcn(hObject, eventdata, handles)
@@ -473,6 +486,7 @@ function Remove4DFlow_Callback(hObject, eventdata, handles)
     set(handles.Listbox4DFlow,'Value',1);
     set(handles.Listbox4DFlow,'String',{pcviprDatasets.Names});
     pcviprDataIter = pcviprDataIter-1;
+    clear index 
 
 % --- REMOVE 4D FLOW CREATE FUNCTION
 function Remove4DFlow_CreateFcn(hObject, eventdata, handles)
@@ -512,6 +526,7 @@ function SaveCaseButton_Callback(hObject, eventdata, handles)
         save(filenameWithPath,'anatDatasets','pcDatasets','magDatasets','pcviprDatasets');
         set(handles.ErrorMessageBar,'String','Data saved successfully');
     end 
+    clear casefileDir casename data chopData filename filenameWithPath
 
     
 % --- ERROR MESSAGE BAR CALLBACK
@@ -549,9 +564,9 @@ function ButtonCompleteLoading_CreateFcn(hObject, eventdata, handles)
 
 %%%%%%%%%%%%%% MY FUNCTIONS %%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Load Dat files
 function v = load_dat(name, res)
-% Load Dat
-% Loads in dat files in current directory.
+
     [fid,errmsg]= fopen(name,'r');
     if fid < 0  % If name does not exist in directory
         disp(['Error Opening Data : ',errmsg]);
@@ -559,12 +574,33 @@ function v = load_dat(name, res)
 
     % Reads in as short, reshapes by image res.
     v = reshape(fread(fid,'short=>single'),res);
-    v = imrotate(v,180);
     fclose(fid);
+    clear fid errmsg 
+
+% Perform 2D background phase correction
+function vMeanCorrected = BGPhaseCorrect(mag,v)
+vmean = mean(v,3);
+vmax = max(v,[],3);
+
+cdThresh = 0.12*max(vmax(:));
+mask = vmax<cdThresh;
+[x,y] = find(mask);
+vmean = double(vmean.*mask);
+vmean = nonzeros(vmean(:));
+
+f = fit( [x, y], vmean, 'poly33' );
+c = coeffvalues(f);
+
+x0 = 1:size(mask,1);
+y0 = 1:size(mask,2);
+
+fits = c(1) + c(2).*x0 + c(3).*y0 + c(4).*(x0.^2) + c(5).*x0.*y0 + c(6).*(y0.^2) ...
+     + c(7).*(x0.^3) + c(8).*(x0.^2).*y0 + c(9).*x0.*(y0.^2) + c(10).*(y0.^3); 
+vmean = vmean-fits;
 
 
-    
-    
+
+
 %%%%%%%%%%%%%% UNUSED %%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % --- MAIN PANEL CREATE FUNCTION

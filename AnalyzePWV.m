@@ -434,7 +434,21 @@ function LoadROIbutton_Callback(hObject, eventdata, handles)
         else 
             handles.pcDatasets(planeNum).ROIdataSpline = roiStatisticsSpline;
         end 
-
+        if ~exist('ROIimages','dir')
+            mkdir ROIimages
+            cd ROIimages
+            frame = getframe(handles.PlanePlot);
+            image = frame2im(frame);
+            imwrite(image,[handles.pcDatasets(planeNum).Names '.png'])
+            cd ..
+        else
+            cd ROIimages
+            frame = getframe(handles.PlanePlot);
+            image = frame2im(frame);
+            imwrite(image,[handles.pcDatasets(planeNum).Names '.png'])
+            cd ..
+        end 
+        
         clear dFlow dMean radius center roiMask area planeNum timeres v
         clear roiDataRaw meanROI medianROI maxROI minROI stdROI flowROI  
         clear dFlowfit dMeanfit circle matrixx t tq vTemp X Y xres i fovx
@@ -502,6 +516,19 @@ function CompleteLoadingROI_Callback(hObject, eventdata, handles)
             spanZ(2) = backBottomRight(3);
             handles.anatDatasets(i).spanZ = spanZ;
         end   
+        
+        if ~exist('FlowWaveformImages','dir')
+            mkdir FlowWaveformImages
+            cd FlowWaveformImages
+            frame = getframe(handles.VelocityPlot);
+            imwrite(frame2im(frame),'FlowWaveform.png')
+            cd ..
+        else
+            cd FlowWaveformImages
+            frame = getframe(handles.VelocityPlot);
+            imwrite(frame2im(frame),'FlowWaveform.png')
+            cd ..
+        end 
 
         clear backBottomRight dims i images originShift rotationMatrix sliceDim
         clear spanZ zLocs topFrontLeft xres xVector yres yVector zres zVector
@@ -792,17 +819,18 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
     end 
     
     guidata(hObject,handles);
-    TTs = computeTTs(handles.flow);
+    computeTTs(handles);
+    
   
     distance = []; TTPeak = []; TTPoint = []; TTFoot = []; TTUpstroke = []; Xcorr = [];
     for i = 1:numel(handles.flow)
         mask = ~isnan(handles.flow(i).Distance);
         distance = [distance handles.flow(i).Distance(mask)];
-        TTPeak = [TTPeak TTs(i).TTPeak(mask)];
-        TTPoint = [TTPoint TTs(i).TTPoint(mask)];
-        TTFoot = [TTFoot TTs(i).TTFoot(mask)];
-        TTUpstroke = [TTUpstroke TTs(i).TTUpstroke(mask)];
-        Xcorr = [Xcorr TTs(i).Xcorr(mask)];
+        TTPeak = [TTPeak handles.flow(i).TTPeak(mask)];
+        TTPoint = [TTPoint handles.flow(i).TTPoint(mask)];
+        TTFoot = [TTFoot handles.flow(i).TTFoot(mask)];
+        TTUpstroke = [TTUpstroke handles.flow(i).TTUpstroke(mask)];
+        Xcorr = [Xcorr handles.flow(i).Xcorr(mask)];
     end
     
     if numel(distance)==1
@@ -933,6 +961,32 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
     else 
         set(handles.averageData,'String','0 m/s');
     end
+    
+    if ~exist('CenterlineImages','dir')
+        mkdir CenterlineImages
+        cd CenterlineImages
+        frame = getframe(handles.AnatomicalPlot);
+        imwrite(frame2im(frame),'Centerline.png')
+        cd ..
+    else
+        cd CenterlineImages
+        frame = getframe(handles.AnatomicalPlot);
+        imwrite(frame2im(frame),'Centerline.png')
+        cd ..
+    end 
+    
+    if ~exist('PWVanalysisPlotImages','dir')
+        mkdir PWVanalysisPlotImages
+        cd PWVanalysisPlotImages
+        frame = getframe(handles.TimeVsDistance);
+        imwrite(frame2im(frame),'PWVanalysisPlot.png')
+        cd ..
+    else
+        cd PWVanalysisPlotImages
+        frame = getframe(handles.TimeVsDistance);
+        imwrite(frame2im(frame),'PWVanalysisPlot.png')
+        cd ..
+    end 
     
     clear allROIs average centerline d difference dist distance distances distances2ROIs
     clear i idx idx2 iterator j legendSet lineAverage lineAverageFit idx1
@@ -1230,9 +1284,10 @@ function updateAnatImages(handles)
 
     
 % --- "Time to" calculations (TTPeak, TTPoint, TTUpstroke, TTFoot, Xcorr)
-function TTs = computeTTs(flow)
+function TTs = computeTTs(handles)
     global startAnalyzing interpType
     
+    flow = handles.flow;
     numROIs = numel(flow);
     for i=1:numROIs
         if startAnalyzing
@@ -1288,7 +1343,7 @@ function TTs = computeTTs(flow)
                 TTPeak(iterator) = timeres.*( curvePoints(iterator).maxPeakVelIdx - curvePoints(i).maxPeakVelIdx );
             end 
         end 
-        TTs(i).TTPeak = TTPeak;
+        handles.flow(i).TTPeak = TTPeak;
     end      
     
     % TTPoint - time to point calculation
@@ -1302,7 +1357,7 @@ function TTs = computeTTs(flow)
                 TTPoint(iterator) = timeres.*( curvePoints(iterator).FiftyPointIdx - curvePoints(i).FiftyPointIdx );
             end 
         end 
-        TTs(i).TTPoint = TTPoint;
+         handles.flow(i).TTPoint = TTPoint;
     end    
     
     % TTUpstroke - time to upstroke calculation
@@ -1319,7 +1374,7 @@ function TTs = computeTTs(flow)
                 TTUpstroke(iterator) = timeres.*(timeresSigmoid1*tUpstroke2 - timeresSigmoid2*tUpstroke1);
             end 
         end 
-        TTs(i).TTUpstroke = TTUpstroke;
+         handles.flow(i).TTUpstroke = TTUpstroke;
     end   
     
     % TTFoot - time to foot calculation
@@ -1342,7 +1397,7 @@ function TTs = computeTTs(flow)
                 TTFoot(iterator) = timeres.*(t2-t1);
             end 
         end 
-        TTs(i).TTFoot = TTFoot;
+         handles.flow(i).TTFoot = TTFoot;
     end 
     
     % XCorr - cross correlation calculation
@@ -1360,9 +1415,10 @@ function TTs = computeTTs(flow)
                 Xcorr(iterator) = shift.*timeres;
             end 
         end 
-        TTs(i).Xcorr = Xcorr;
+         handles.flow(i).Xcorr = Xcorr;
     end 
-
+    
+guidata(hObject,handles);
     
 % --- Condense and organize flow data obtained from ROIs
 function flow = organizeFlowInfo(handles)
@@ -1392,6 +1448,7 @@ function flow = organizeFlowInfo(handles)
             end 
         end 
     end 
+    clear count i name planeName
 
     
 % --- Turn PolyLine into SplineLine    
@@ -1399,25 +1456,21 @@ function Y = interppolygon(X,N)
     if nargin < 2 || N < 2
         N = 2;
     end
-    n_dim = size(X,2);
-    delta_X = 0;
+    nDim = size(X,2);
+    dx = 0;
     
-    for dim = 1:n_dim
-        delta_X = delta_X + diff(X(:,dim)).^2 ;
+    for dim = 1:nDim
+        dx = dx + diff(X(:,dim)).^2 ;
     end
     
-    lengthBetweenPoints = sqrt(delta_X);
+    lengthBetweenPoints = sqrt(dx);
     lengthLine = sum(lengthBetweenPoints);
-    orig_metric = [0; cumsum(lengthBetweenPoints/lengthLine)];
+    origMetric = [0; cumsum(lengthBetweenPoints/lengthLine)];
     
-    interp_metric = (0:(1/(N-1)):1)';
-    Y = interp1(orig_metric,X,interp_metric,'makima');
-    
-    for dim = 1:n_dim
-        delta_X = delta_X + diff(X(:,dim)).^2 ;
-    end
-    
-    lengthPolyLine = sum(sqrt(delta_X));
+    interpMetric = (0:(1/(N-1)):1)';
+    Y = interp1(origMetric,X,interpMetric,'makima');
+    %Y = csaps([0 times times(end)+times(1)],[0 meanROI 0],0.0001,timesInterp);
+    clear interpMetric origMetric lengthLine lengthBetweenPoints dx nDim
     
     
 % --- Plot Velocities    
@@ -1468,6 +1521,7 @@ function plotVelocity(handles)
     legend(legendSet); hold off
     xlabel('Time (ms)'); ylabel('Mean Velocity in ROI (mm/s)');
     xlim([times(1),times(end)]);
+    clear legendSet count times flow stdev i
     
 
 % --- Sigmoid Fit Function
@@ -1496,8 +1550,10 @@ function [sigmoid,upslope,curvature,t1,t2,timeres] = sigFit(meanROI)
         ddy = 4*(sigmoid(i+1)-2*sigmoid(i)+sigmoid(i-1));
         curvature(i) = (ddy*dt - ddt*dy)./((dt^2 + dy^2).^(3/2));
     end 
-
     [~,t1] = max(curvature);
+    %save upslope sigmoid curvature plots
+    clear peak upslope t times t2 timeres sigmoidModel c0 opts c 
+    clear sigmoid dt ddt dy ddy curvature
     
 % --- Calculate derivative   
 function fPrime = derivative(f)
