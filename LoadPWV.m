@@ -93,13 +93,13 @@ function PreloadCaseButton_Callback(hObject, eventdata, handles)
     disp('Case file loaded successfully');
     set(handles.ErrorMessageBar,'String','Case file loaded successfully')
 
-    anatDataIter = numel(anatDatasets);
-    pcDataIter = numel(pcDatasets);
-    magDataIter = numel(magDatasets);
-    pcviprDataIter = numel(pcviprDatasets);
+    anatDataIter = numel(anatDatasets)+1;
+    pcDataIter = numel(pcDatasets)+1;
+    magDataIter = numel(magDatasets)+1;
+    pcviprDataIter = numel(pcviprDatasets)+1;
     preloaded = 1;
     
-    clear casefile casefilDir
+    clear casefile casefileDir
 
 
     
@@ -236,6 +236,7 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
         dirInfo = dir(fullfile(pcDir,['*' extension]));
         if isequal(extension,'.dcm')
             pcDatasets(pcDataIter).Info = dicominfo(fullfile(pcDir,dirInfo(1).name));
+            pcDatasets(pcDataIter).isDICOM = 1;
             for i=1:length(dirInfo)
                 temp(:,:,i) = single(dicomread(fullfile(pcDir,dirInfo(i).name)));
             end   
@@ -249,6 +250,7 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
             dataArray{1,2} = cellfun(@str2num,dataArray{1,2}(:), 'UniformOutput', false);
             pcviprHeader = cell2struct(dataArray{1,2}(:), dataArray{1,1}(:), 1);
             pcDatasets(pcDataIter).Info = pcviprHeader;
+            pcDatasets(pcDataIter).isDICOM = 0;
             resx = pcviprHeader.matrixx;  
             resy = pcviprHeader.matrixy;  
             nframes = pcviprHeader.frames;      
@@ -280,7 +282,7 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
     end 
     
     clear name pcFile pcDir cd mag v CD MAG VMEAN resx resy pcviprHeader 
-    clear dataArray nframes dirInfo temp i extension 
+    clear dataArray nframes dirInfo temp i j fid ans extension data
 
 % --- BUTTON LOAD 2DPC CREATE FUNCTION
 function ButtonLoad2DPC_CreateFcn(hObject, eventdata, handles)
@@ -526,7 +528,7 @@ function SaveCaseButton_Callback(hObject, eventdata, handles)
         save(filenameWithPath,'anatDatasets','pcDatasets','magDatasets','pcviprDatasets');
         set(handles.ErrorMessageBar,'String','Data saved successfully');
     end 
-    clear casefileDir casename data chopData filename filenameWithPath
+    clear casefileDir casename date chopData filename filenameWithPath
 
     
 % --- ERROR MESSAGE BAR CALLBACK
@@ -553,11 +555,11 @@ function ButtonCompleteLoading_Callback(hObject, eventdata, handles)
         disp('Loading Process Complete...');
         set(handles.ErrorMessageBar,'String','Loading Process Complete...');
         AnalyzePWV(anatDatasets,pcDatasets,magDatasets)
-        %AnalyzePWV_lite(anatDatasets,pcDatasets,magDatasets)
     end 
 
 % --- COMPLETE LOADING BUTTON CREATE FUNCTION
 function ButtonCompleteLoading_CreateFcn(hObject, eventdata, handles)
+
 
 
 
@@ -578,25 +580,28 @@ function v = load_dat(name, res)
     clear fid errmsg 
 
 % Perform 2D background phase correction
-function vMeanCorrected = BGPhaseCorrect(mag,v)
-vmean = mean(v,3);
-vmax = max(v,[],3);
+function vmean = BGPhaseCorrect(mag,v)
+vmean = mean(abs(v),3);
+vmax = max(abs(v),[],3);
 
-cdThresh = 0.12*max(vmax(:));
+cdThresh = 0.10*max(vmax(:));
 mask = vmax<cdThresh;
-[x,y] = find(mask);
+[rows,cols] = find(mask);
 vmean = double(vmean.*mask);
-vmean = nonzeros(vmean(:));
+vmeanVector = nonzeros(vmean(:));
 
-f = fit( [x, y], vmean, 'poly33' );
+f = fit( [rows, cols], vmeanVector, 'poly33' );
 c = coeffvalues(f);
 
 x0 = 1:size(mask,1);
 y0 = 1:size(mask,2);
+[y,x] = meshgrid(x0,y0);
 
-fits = c(1) + c(2).*x0 + c(3).*y0 + c(4).*(x0.^2) + c(5).*x0.*y0 + c(6).*(y0.^2) ...
-     + c(7).*(x0.^3) + c(8).*(x0.^2).*y0 + c(9).*x0.*(y0.^2) + c(10).*(y0.^3); 
+fits = c(1) + c(2).*x + c(3).*y + c(4).*(x.^2) + c(5).*x.*y + c(6).*(y.^2) ...
+     + c(7).*(x.^3) + c(8).*(x.^2).*y + c(9).*x.*(y.^2) + c(10).*(y.^3); 
 vmean = vmean-fits;
+
+
 
 
 
