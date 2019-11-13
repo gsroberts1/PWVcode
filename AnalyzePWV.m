@@ -229,7 +229,7 @@ function DrawROIbutton_Callback(hObject, eventdata, handles)
     set(handles.PlanePopup,'Enable','off');
     set(handles.ZoomButton,'Enable','off');
     set(handles.UnzoomButton,'Enable','off');
-    
+    %length([handles.pcDatasets.ROIdata]);
     planeNum = get(handles.PlanePopup,'Value');
     if isempty(handles.pcDatasets(planeNum).ROI)
         mydlg = warndlg('Press enter when the ROI is set');
@@ -1960,7 +1960,6 @@ function plotVelocity(handles)
     xlabel('Time (ms)'); ylabel('Mean Velocity in ROI (mm/s)');
     xlim([times(1),times(end)]);
     
-    guidata(hObject,handles)
     clear legendSet count times flow stdev i
     
 
