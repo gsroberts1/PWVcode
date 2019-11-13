@@ -22,7 +22,7 @@ function varargout = AnalyzePWV(varargin)
 
     % Edit the above text to modify the response to help AnalyzePWV
 
-    % Last Modified by GUIDE v2.5 04-Nov-2019 18:07:34
+    % Last Modified by GUIDE v2.5 05-Nov-2019 11:15:17
 
     % Begin initialization code - DO NOT EDIT
     gui_Singleton = 1;
@@ -57,8 +57,6 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     % Update handles structure
     guidata(hObject, handles);
 
-    global zoomed zoomedAnat spanUD spanLR spanUDAnat spanLRAnat
-    global  interpType pgShift showErrorBars startAnalyzing
     
     handles.anatDatasets = varargin{1};
     handles.pcDatasets = varargin{2};
@@ -70,16 +68,17 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     handles.pcDatasets(1).ROIdataMakima = [];
     handles.pcDatasets(1).ROIdataGaussian = [];
     handles.pcDatasets(1).ROIdataSpline = [];
-    zoomed = 0;
-    zoomedAnat = 0;
-    spanUD = [0,0];
-    spanLR = [0,0];
-    spanUDAnat = [0,0];
-    spanLRAnat = [0,0];
-    interpType = 'None';
-    pgShift = 0;
-    showErrorBars = 0;
-    startAnalyzing = 0;
+    
+    handles.global.zoomed = 0;
+    handles.global.zoomedAnat = 0;
+    handles.global.spanUD = [0,0];
+    handles.global.spanLR = [0,0];
+    handles.global.spanUDAnat = [0,0];
+    handles.global.spanLRAnat = [0,0];
+    handles.global.interpType = 'None';
+    handles.global.pgShift = 0;
+    handles.global.showErrorBars = 0;
+    handles.global.startAnalyzing = 0;
     
     set(handles.PlanePopup,'String',{handles.pcDatasets.Names});
     set(handles.DatasetPopup,'String',fieldnames(handles.pcDatasets(1).Data));
@@ -154,16 +153,19 @@ function MAGRadio_Callback(hObject, eventdata, handles)
     
 
 % --- PLANE DROPDOWN - CALLBACK
-function PlanePopup_Callback(hObject, eventdata, handles)
-    global zoomed spanUD spanLR
+function PlanePopup_Callback(hObject, eventdata, handles)   
+    handles.global.zoomed = 0;
+    handles.global.spanUD = 0;
+    handles.global.spanLR = 0;
     
-    zoomed = 0; spanUD = 0; spanLR = 0;
     planeNum = get(handles.PlanePopup,'Value');
     if get(handles.PCRadio,'Value')
         set(handles.DatasetPopup,'String',fieldnames(handles.pcDatasets(planeNum).Data));
     end 
     set(handles.DatasetPopup,'Value',1);
+    
     clear planeNum
+    guidata(hObject, handles);
     updateImages(handles);
 
 % --- PLANE DROPDOWN - CREATE FUNCTION
@@ -186,26 +188,31 @@ function DatasetPopup_CreateFcn(hObject, eventdata, handles)
     
 % --- ZOOM BUTTON - CALLBACK
 function ZoomButton_Callback(hObject, eventdata, handles)
-    global zoomed spanUD spanLR
     axes(handles.PlanePlot)
     
-    disp('Draw an ROI to zoom in');
+    set(handles.MessageBar,'String','Draw an ROI to zoom in.');
     rect = drawrectangle;
     positions = round(rect.Position);
-    spanUD = spanUD(1)+positions(2):(spanUD(1)+positions(2)+positions(4));
-    spanLR = spanLR(1)+positions(1):(spanLR(1)+positions(1)+positions(3));
-    zoomed = 1;
+    spanUD = handles.global.spanUD;
+    spanLR = handles.global.spanLR;
+    handles.global.spanUD = spanUD(1)+positions(2):(spanUD(1)+positions(2)+positions(4));
+    handles.global.spanLR = spanLR(1)+positions(1):(spanLR(1)+positions(1)+positions(3));
+    handles.global.zoomed = 1;
     
-    clear rect positions
+    clear rect positions spanUD spanLR
+    guidata(hObject, handles);
     updateImages(handles);
  
     
 % --- UNZOOM BUTTON - CALLBACK
 function UnzoomButton_Callback(hObject, eventdata, handles)
-   global zoomed spanUD spanLR
     axes(handles.PlanePlot)
     
-    zoomed = 0; spanUD = 0; spanLR = 0;
+    handles.global.zoomed = 0; 
+    handles.global.spanUD = 0; 
+    handles.global.spanLR = 0;
+    
+    guidata(hObject,handles);
     updateImages(handles);
 
     
@@ -235,11 +242,11 @@ function DrawROIbutton_Callback(hObject, eventdata, handles)
                   key = get(gcf,'currentcharacter'); 
                       switch key
                           case 27 % 27 is the escape key
-                              disp('User pressed the escape key. Deleting ROI.')
+                              set(handles.MessageBar,'String','User pressed the escape key. Deleting ROI.');
                               DeleteROIbutton_Callback(hObject, eventdata, handles)
                               break % break out of the while loop
                           case 13 % 13 is the return key 
-                              disp('ROI selected');
+                              set(handles.MessageBar,'String','ROI selected.');
                               circle.InteractionsAllowed = 'none';
                               break
                           otherwise 
@@ -290,13 +297,11 @@ function DeleteROIbutton_Callback(hObject, eventdata, handles)
     
 % --- LOAD ROI BUTTON - CALLBACK
 function LoadROIbutton_Callback(hObject, eventdata, handles)
-    global spanUD spanLR zoomed
-    
     planeNum = get(handles.PlanePopup,'Value');
     if get(handles.PCRadio,'Value')
         v = handles.pcDatasets(planeNum).Data.v;
-        if zoomed
-            v = v(spanUD,spanLR,:);
+        if handles.global.zoomed
+            v = v(handles.global.spanUD,handles.global.spanLR,:);
         end 
         circle = handles.pcDatasets(planeNum).ROI;
         radius = circle.Radius; 
@@ -546,25 +551,24 @@ function VelocityPlot_CreateFcn(hObject, eventdata, handles)
 
 % --- INTERPOLATE POPUP - CALLBACK
 function InterpolatePopup_Callback(hObject, eventdata, handles)
-    global interpType startAnalyzing
-    
     interp = get(handles.InterpolatePopup,'Value');
     switch interp
         case 1
-            interpType = 'None';
+            handles.global.interpType = 'None';
         case 2 
-            interpType = 'Makima';
+            handles.global.interpType = 'Makima';
         case 3 
-            interpType = 'Gaussian';
+            handles.global.interpType = 'Gaussian';
         case 4
-            interpType = 'Spline';
+            handles.global.interpType = 'Spline';
         otherwise
     end 
  
     clear interp
+    guidata(hObject, handles);
     plotVelocity(handles)
     
-    if startAnalyzing
+    if handles.global.startAnalyzing
         ComputePWVButton_Callback(hObject, eventdata, handles);
     end 
 
@@ -577,26 +581,25 @@ function InterpolatePopup_CreateFcn(hObject, eventdata, handles)
     
 % --- ERROR BAR RADIO - CALLBACK
 function ErrorBarRadio_Callback(hObject, eventdata, handles)
-    global showErrorBars
     if get(handles.ErrorBarRadio,'Value')
-        showErrorBars = 1;
+        handles.global.showErrorBars = 1;
     else 
-        showErrorBars = 0;
+        handles.global.showErrorBars = 0;
     end 
-
+    
+    guidata(hObject,handles);
     plotVelocity(handles)
     
     
 % --- PG SHIFT RADIO - CALLBACK
 function PGshiftRadio_Callback(hObject, eventdata, handles)
-    global pgShift startAnalyzing
-    
     if get(handles.PGshiftRadio,'Value')
-        pgShift = 1;
+        handles.global.pgShift = 1;
     else 
-        pgShift = 0;
+        handles.global.pgShift = 0;
     end 
     
+    guidata(hObject,handles);
     plotVelocity(handles)
     if startAnalyzing
         ComputePWVButton_Callback(hObject, eventdata, handles);
@@ -655,114 +658,219 @@ function ShowPlanesRadio_Callback(hObject, eventdata, handles)
     
 % --- ZOOM ANATOMICAL - CALLBACK
 function ZoomAnatomicalButton_Callback(hObject, eventdata, handles)
-    global zoomedAnat spanUDAnat spanLRAnat
     axes(handles.AnatomicalPlot)
     
-    disp('Draw an ROI to zoom in');
+    set(handles.MessageBar,'String','Draw an ROI to zoom in');
     rect = drawrectangle;
     positions = round(rect.Position);
+    spanUDAnat = handles.global.spanUDAnat;
+    spanLRAnat = handles.global.spanLRAnat;
     spanUDAnat = spanUDAnat(1)+positions(2):(spanUDAnat(1)+positions(2)+positions(4));
     spanLRAnat = spanLRAnat(1)+positions(1):(spanLRAnat(1)+positions(1)+positions(3));
-    zoomedAnat = 1;
+    handles.global.zoomedAnat = 1;
     
     clear rect positions 
+    guidata(hObject, handles);
     updateAnatImages(handles);
     
     
 % --- UNZOOM ANATOMICAL - CALLBACK
 function UnzoomAnatomicalButton_Callback(hObject, eventdata, handles)
-    global zoomedAnat spanUDAnat spanLRAnat
     axes(handles.AnatomicalPlot)
     
-    zoomedAnat = 0; spanUDAnat = 0; spanLRAnat = 0;
+    handles.global.zoomedAnat = 0; 
+    handles.global.spanUDAnat = 0; 
+    handles.global.spanLRAnat = 0;
+    
+    guidata(hObject, handles);
     updateAnatImages(handles);
 
 
 % --- DRAW CENTERLINE - CALLBACK
 function DrawCenterlineButton_Callback(hObject, eventdata, handles)
-    axes(handles.AnatomicalPlot); 
-    
-    set(handles.ShowPlanesRadio,'Value',1);
-    set(handles.ShowPlanesRadio,'Enable','off');
-    set(handles.DrawROIbutton,'Enable','off');
-    set(handles.DeleteCenterlineButton,'Enable','on');
-    set(handles.ComputePWVButton,'Enable','on');
-    set(handles.SliderAnatomical,'Enable','off');
-    set(handles.AnatListbox,'Enable','off');
-    set(handles.ZoomAnatomicalButton,'Enable','off');
-    set(handles.UnzoomAnatomicalButton,'Enable','off');
-    set(handles.ShowPlanesRadio,'Value',1);
-    ShowPlanesRadio_Callback(hObject, eventdata, handles);
-    
-    datasetNum = get(handles.AnatListbox,'Value');
-    yres = handles.anatDatasets(datasetNum).Info.PixelSpacing(2);
-    anatRotation = handles.anatDatasets(datasetNum).rotationMatrix;
-    colsRunningDir = sign(nonzeros(anatRotation(:,3)));
-    spanZ = handles.anatDatasets(datasetNum).spanZ;
-    for i=1:numel(handles.flow)
-        planeLinePhysical = colsRunningDir*(handles.flow(i).zLocs-spanZ(1));
-        planeLineRow = round(planeLinePhysical/yres);
-        handles.flow(i).planeLineRow = planeLineRow;
-        guidata(hObject,handles);
-    end 
-
-    datasetNum = get(handles.AnatListbox,'Value');
-    if isempty(handles.anatDatasets(datasetNum).Centerline)
-        mydlg = warndlg('Press enter when the centerline is drawn');
-        waitfor(mydlg);
-        line = drawpolyline('Color','r','LineWidth',1);
-        while true
-            w = waitforbuttonpress; 
-            switch w 
-                case 1 % (keyboard press) 
-                  key = get(gcf,'currentcharacter'); 
-                      switch key
-                          case 27 % 27 is the escape key
-                              disp('User pressed the escape key. Deleting ROI.')
-                              DeleteCenterlineButton_Callback(hObject, eventdata, handles)
-                              break % break out of the while loop
-                          case 13 % 13 is the return key 
-                              disp('ROI selected');
-                              line.InteractionsAllowed = 'none';
-                              break
-                          otherwise 
-                              % Wait for a different command. 
-                      end
-           end
-        end
+%         axes(handles.AnatomicalPlot); 
+%         if isempty(get(handles.range1Edit,'String')) || isempty(get(handles.range1Edit,'String'))
+%             set(handles.MessageBar,'String','Range is required to draw centerlines')
+%         else 
         
-    splinePositions = interppolygon(line.Position,100);
-    line.Position = splinePositions;
-    
-    if isfield(handles.anatDatasets(datasetNum).Info,'matrixx')
-        matrixx = handles.anatDatasets(datasetNum).Info.matrixx;
-        fovx = handles.anatDatasets(datasetNum).Info.fovx;
-        xres = fovx/matrixx;
-        matrixy = handles.anatDatasets(datasetNum).Info.matrixy;
-        fovy = handles.anatDatasets(datasetNum).Info.fovy;
-        yres = fovy/matrixy;
-    else 
+            
+            
+        ShowPlanesRadio_Callback(hObject, eventdata, handles);
+        
+        set(handles.ShowPlanesRadio,'Value',1);
+        set(handles.ShowPlanesRadio,'Enable','off');
+        set(handles.DrawROIbutton,'Enable','off');
+        set(handles.DeleteCenterlineButton,'Enable','on');
+        set(handles.ComputePWVButton,'Enable','on');
+        set(handles.SliderAnatomical,'Enable','off');
+        set(handles.AnatListbox,'Enable','off');
+        set(handles.ZoomAnatomicalButton,'Enable','off');
+        set(handles.UnzoomAnatomicalButton,'Enable','off');
+        set(handles.ShowPlanesRadio,'Value',1);        
+        
+        range1 = str2double(get(handles.range1Edit,'String'));
+        range2 = str2double(get(handles.range2Edit,'String'));
+        datasetNum = get(handles.AnatListbox,'Value');
+        
         xres = handles.anatDatasets(datasetNum).Info.PixelSpacing(1);
         yres = handles.anatDatasets(datasetNum).Info.PixelSpacing(2);
-    end
+        sliceres = handles.anatDatasets(datasetNum).Info.SliceThickness;
+        
+        anatRotation = handles.anatDatasets(datasetNum).rotationMatrix;
+        colsRunningDir = sign(nonzeros(anatRotation(:,3)));
+        spanZ = handles.anatDatasets(datasetNum).spanZ;
+        for i=1:numel(handles.flow)
+            planeLinePhysical = colsRunningDir*(handles.flow(i).zLocs-spanZ(1));
+            planeLineRow = round(planeLinePhysical/yres);
+            handles.flow(i).planeLineRow = planeLineRow;
+            guidata(hObject,handles);
+        end 
+        
+        
+        
+        
+        
+%         axes(handles.AnatomicalPlot);
+%         images = handles.anatDatasets(datasetNum).Data(:,:,range1:range2);
+%         x = []; y = []; z = [];
+%         for i=1:size(images,3)
+%             image = images(:,:,i);
+%             imshow(image,[]);
+%             [xTemp,yTemp] = getpts();
+%             zTemp = i.*(ones(size(xTemp,1),1));
+%             x = [x; xTemp];
+%             y = [y; yTemp];
+%             z = [z; zTemp];
+%         end 
+%         
+%         figure; scatter(y,x); xline(127); xline(325);
+%         line1 = drawpolyline;
+%         figure; scatter(y,z);  xline(127); xline(325);
+%         line2 = drawpolyline;
+%                 
+%         splinePositions1 = interppolygon(line1.Position,150);
+%         splinePositions2 = interppolygon(line2.Position,150);
+%         %NEED TO EDIT IF CORONAL
+%         splineLine(:,1) = flipud(splinePositions2(:,2)); %x physical
+%         splineLine(:,2) = splinePositions1(:,2); %y
+%         splineLine(:,3) = splinePositions1(:,1); %z
+%         figure; scatter3(y,x,z); hold on; 
+%         scatter3(splineLine(:,3),splineLine(:,2),splineLine(:,1),'filled');
+%         xlabel('x'); ylabel('y'); zlabel('slice');
+%         x = linspace( min(splineLine(:,2))-50, max(splineLine(:,2))+50, 512);
+%         y = linspace( min(splineLine(:,1))-2, max(splineLine(:,1))+2, 512);
+%         [X,Y] = meshgrid(x,y);
+%         for i=1:numel(handles.flow)
+%             Z = (handles.flow(i).planeLineRow).*ones(size(X));
+%             hold on; surf(Z,X,Y);
+%         end 
+%         hold off;
 
-    distances = zeros(1,length(splinePositions)-1);
-    for i=1:length(splinePositions)-1
-        distances(i) = sqrt( xres.*(splinePositions(i,1)-splinePositions(i+1,1)).^2 + yres.*(splinePositions(i,2)-splinePositions(i+1,2)).^2 );
-    end 
-    distances(end+1)=0;
-    handles.anatDatasets(datasetNum).Distances = distances;
-    handles.anatDatasets(datasetNum).Centerline = line;
+%         figure; scatter3(splineLine(:,3),splineLine(:,2),splineLine(:,1),30,'filled','g'); hold on;
+%         xlabel('x'); ylabel('y'); zlabel('slice');
+%         image1 = handles.pcDatasets(1).Data.MAG;
+%         image1 = image1(100:412,100:412);
+%         image2 = handles.pcDatasets(2).Data.MAG;
+%         image2 = image2(100:412,100:412);
+%         
+%         x1 = (linspace( min(splineLine(:,2))-80, max(splineLine(:,2))+80, size(image1,1))*1.4)-110;
+%         x2 = linspace( min(splineLine(:,2))-80, max(splineLine(:,2))+80, size(image2,1))+15;
+%         
+%         y1 = linspace( min(splineLine(:,1))-8, max(splineLine(:,1))+8, size(image1,1))-0.7;
+%         y1 = repmat(y1,size(image1,1),1);
+%         
+%         y2 = linspace( min(splineLine(:,1))-8, max(splineLine(:,1))+8, size(image2,1));
+%         y2 = repmat(y2,size(image2,1),1)-0.25;
+%         
+%         z1 = (handles.flow(1).planeLineRow).*ones(1,length(x1));
+%         z2 = (handles.flow(3).planeLineRow).*ones(1,length(x2));
+%         
+%         surf(z1,x1,y1,image1); colormap('gray'); hold on;
+%         surf(z2,x2,y2,image2); colormap('gray'); shading interp
+% 
+%         
+%         distances = zeros(1,length(splinePositions1)-1);
+%         for i=1:length(splinePositions1)-1
+%             xSquare = (sliceres.*(splineLine(i,1)-splineLine(i+1,1))).^2;
+%             ySquare = (xres.*(splineLine(i,2)-splineLine(i+1,2))).^2;
+%             zSquare = (yres.*(splineLine(i,3)-splineLine(i+1,3))).^2;
+%             distances(i) = sqrt( xSquare + ySquare + zSquare );
+%         end 
+%         distances(end+1)=0;
+%         handles.anatDatasets(datasetNum).Distances = distances;
+%         handles.anatDatasets(datasetNum).Centerline = splineLine;
+% 
+%         clear datasetNum yres anatRotation colsRunningDir spanZ i w mydlg 
+%         clear key planeLinePhysical planeLineRow matrixx fovx xres matrixy 
+%         clear fovy yres distances splinePositions
+%         
+%         guidata(hObject,handles);
+%         updateImages(handles);
+
+% % %         if isempty(handles.anatDatasets(datasetNum).Centerline)
+% % %             mydlg = warndlg('Press enter when the centerline is drawn');
+% % %             waitfor(mydlg);
+% % %             line = drawpolyline('Color','r','LineWidth',1);
+% % %             while true
+% % %                 w = waitforbuttonpress; 
+% % %                 switch w 
+% % %                     case 1 % (keyboard press) 
+% % %                       key = get(gcf,'currentcharacter'); 
+% % %                           switch key
+% % %                               case 27 % 27 is the escape key
+% % %                                   set(handles.MessageBar,'String','User pressed the escape key. Deleting ROI.');
+% % %                                   DeleteCenterlineButton_Callback(hObject, eventdata, handles)
+% % %                                   break % break out of the while loop
+% % %                               case 13 % 13 is the return key 
+% % %                                   set(handles.MessageBar,'String','ROI selected.');
+% % %                                   line.InteractionsAllowed = 'none';
+% % %                                   break
+% % %                               otherwise 
+% % %                                   % Wait for a different command. 
+% % %                           end
+% % %                end
+% % %             end
+% % % 
+% % %         splinePositions = interppolygon(line.Position,100);
+% % %         line.Position = splinePositions;
+% % % 
+% % %         if isfield(handles.anatDatasets(datasetNum).Info,'matrixx')
+% % %             matrixx = handles.anatDatasets(datasetNum).Info.matrixx;
+% % %             fovx = handles.anatDatasets(datasetNum).Info.fovx;
+% % %             xres = fovx/matrixx;
+% % %             matrixy = handles.anatDatasets(datasetNum).Info.matrixy;
+% % %             fovy = handles.anatDatasets(datasetNum).Info.fovy;
+% % %             yres = fovy/matrixy;
+% % %         else 
+% % %             xres = handles.anatDatasets(datasetNum).Info.PixelSpacing(1);
+% % %             yres = handles.anatDatasets(datasetNum).Info.PixelSpacing(2);
+% % %         end
+% % % 
+% % %         distances = zeros(1,length(splinePositions)-1);
+% % %         for i=1:length(splinePositions)-1
+% % %             distances(i) = sqrt( (xres.*(splinePositions(i,1)-splinePositions(i+1,1))).^2 + (yres.*(splinePositions(i,2)-splinePositions(i+1,2))).^2 );
+% % %         end 
+% % %         distances(end+1)=0;
+% % %         handles.anatDatasets(datasetNum).Distances = distances;
+% % %         handles.anatDatasets(datasetNum).Centerline = line;
+% % % 
+% % %         clear datasetNum yres anatRotation colsRunningDir spanZ i w mydlg 
+% % %         clear key planeLinePhysical planeLineRow matrixx fovx xres matrixy 
+% % %         clear fovy yres distances splinePositions
+% % %         guidata(hObject,handles);
+% % %         updateImages(handles);
+% % %         else
+% % %             fprintf('A Centerline has already been placed!\n');
+% % %         end 
+%         end
     
-    clear datasetNum yres anatRotation colsRunningDir spanZ i w mydlg 
-    clear key planeLinePhysical planeLineRow matrixx fovx xres matrixy 
-    clear fovy yres distances splinePositions
+    datasetNum = get(handles.AnatListbox,'Value');
+    oldData = load('D:\PWV\volunteers\Mulan-Volunteer_PWV_01833_2019-11-02-h11\01833_00008_pwv-radial_Aao_PG\2500proj\Data-DataAnalysis\anatDatasets.mat');
+    handles.anatDatasets(datasetNum).Distances = oldData.anatDatasets(datasetNum).Distances;
+    handles.anatDatasets(datasetNum).Centerline = oldData.anatDatasets(datasetNum).Centerline;
     guidata(hObject,handles);
-    updateImages(handles);
-    else
-        fprintf('A Centerline has already been placed!\n');
-    end 
-
+    clear oldData  
+    
 % --- DELETE CENTERLINE - CALLBACK
 function DeleteCenterlineButton_Callback(hObject, eventdata, handles)
     cla(handles.AnatomicalPlot,'reset');
@@ -784,13 +892,36 @@ function DeleteCenterlineButton_Callback(hObject, eventdata, handles)
     hold off
     guidata(hObject,handles);
     updateAnatImages(handles);
+    
+    
+   
+% --- SLICE NUMBER TEXT - CREATE FUNCTION
+function sliceNumText_CreateFcn(hObject, eventdata, handles)
+    
+
+% --- RANGE 1 EDIT - CALLBACK
+function range1Edit_Callback(hObject, eventdata, handles)
+
+% --- RANGE 1 EDIT - CREATE FUNCTION
+function range1Edit_CreateFcn(hObject, eventdata, handles)
+    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+        set(hObject,'BackgroundColor','white');
+    end
+
+
+% --- RANGE 2 EDIT - CALLBACK
+function range2Edit_Callback(hObject, eventdata, handles)
+
+% --- RANGE 2 EDIT - CREATE FUNCTION
+function range2Edit_CreateFcn(hObject, eventdata, handles)
+    if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+        set(hObject,'BackgroundColor','white');
+    end
    
     
 % --- COMPUTE PWV - CALLBACK
 function ComputePWVButton_Callback(hObject, eventdata, handles)
-    global startAnalyzing
-    
-    startAnalyzing = 1;
+    handles.global.startAnalyzing = 1;
     set(handles.DrawROIbutton,'Enable','off');
     set(handles.DeleteCenterlineButton,'Enable','off');
     set(handles.ShowPlanesRadio,'Enable','on');
@@ -802,7 +933,7 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
     distances = [handles.anatDatasets.Distances];
     centerline = [handles.anatDatasets.Centerline];
     planeRows = [handles.flow.planeLineRow];
-    y = centerline.Position(:,2);
+    y = centerline(:,3);
     
     difference = ones(length(y),1);
     for i=1:length(planeRows)
@@ -810,11 +941,11 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
     end 
     minima = islocalmin(abs(difference));
     
-    if y(1)-planeRows(1)<0
+    if y(1)<planeRows(1)
         minima(1) = 1;
     end 
     
-    if y(end)-planeRows(end)<0
+    if y(end)<planeRows(end)<0
         minima(end) = 1;
     end 
     roiIdxAlongLine = nonzeros(minima.*(1:length(y))');
@@ -1059,9 +1190,6 @@ function resetButton_Callback(hObject, eventdata, handles)
         case 'NO'
             reset = 0;
     end
-
-    global zoomed zoomedAnat spanUD spanLR spanUDAnat spanLRAnat
-    global  interpType showErrorBars startAnalyzing pgShift
     
     if reset
         set(handles.ttpData,'String',' ');
@@ -1111,16 +1239,16 @@ function resetButton_Callback(hObject, eventdata, handles)
         handles.pcDatasets(1).ROIdataGaussian = [];
         handles.pcDatasets(1).ROIdataSpline = [];
         
-        zoomed = 0;
-        zoomedAnat = 0;
-        spanUD = [0,0];
-        spanLR = [0,0];
-        spanUDAnat = [0,0];
-        spanLRAnat = [0,0];
-        interpType = 'None';
-        showErrorBars = 0;
-        startAnalyzing = 0;
-        pgShift = 0;
+        handles.global.zoomed = 0;
+        handles.global.zoomedAnat = 0;
+        handles.global.spanUD = [0,0];
+        handles.global.spanLR = [0,0];
+        handles.global.spanUDAnat = [0,0];
+        handles.global.spanLRAnat = [0,0];
+        handles.global.interpType = 'None';
+        handles.global.showErrorBars = 0;
+        handles.global.startAnalyzing = 0;
+        handles.global.pgShift = 0;
 
         set(handles.DrawROIbutton,'Enable','on');
         set(handles.DeleteROIbutton,'Enable','on');
@@ -1174,11 +1302,10 @@ function TimeVsDistance_CreateFcn(hObject, eventdata, handles)
 
 % --- EXPORT ANALYSIS - CALLBACK
 function ExportAnalysisButton_Callback(hObject, eventdata, handles)
-    global interpType
     interpTypes = {'None', 'Makima', 'Gaussian', 'Spline'};
 
     for t=1:length(interpTypes)
-        interpType = interpTypes{t};
+        handles.global.interpType = interpTypes{t};
         flow = computeTTs(handles.flow);
         Distance = []; TTPeak = []; TTPoint = []; TTFoot = []; TTUpstroke = []; Xcorr = [];
         
@@ -1254,46 +1381,51 @@ function ExportAnalysisButton_Callback(hObject, eventdata, handles)
         
         if numel(Distance)>2    
             if get(handles.ttpRadio,'Value')
-                linePeakFit = polyfit(Distance,TTPeak,1);
+                [linePeakFit,Speak] = polyfit(Distance,TTPeak,1);
                 PWV_Peak(entryCount+1) = 1/linePeakFit(1);
                 PWV_Peak(entryCount+2) = linePeakFit(1);
                 PWV_Peak(entryCount+3) = linePeakFit(2);
+                Speak
             end 
             
             if get(handles.ttpRadio,'Value')
-                linePointFit = polyfit(Distance,TTPoint,1);
+                [linePointFit,Spoint] = polyfit(Distance,TTPoint,1);
                 PWV_Point(entryCount+1) = 1/linePointFit(1);
                 PWV_Point(entryCount+2) = linePointFit(1);
                 PWV_Point(entryCount+3) = linePointFit(2);
+                Spoint
             end 
             
             if get(handles.ttfRadio,'Value')
-                lineFootFit = polyfit(Distance,TTFoot,1);
+                [lineFootFit,Sfoot] = polyfit(Distance,TTFoot,1);
                 PWV_Foot(entryCount+1) = 1/lineFootFit(1);
                 PWV_Foot(entryCount+2) = lineFootFit(1);
                 PWV_Foot(entryCount+3) = lineFootFit(2);
+                Sfoot
             end 
             
             if get(handles.ttuRadio,'Value')
-                lineUpstrokeFit = polyfit(Distance,TTUpstroke,1);
+                [lineUpstrokeFit,Supstroke] = polyfit(Distance,TTUpstroke,1);
                 PWV_Upstroke(entryCount+1) = 1/lineUpstrokeFit(1);
                 PWV_Upstroke(entryCount+2) = lineUpstrokeFit(1);
                 PWV_Upstroke(entryCount+3) = lineUpstrokeFit(2);
+                Supstroke
             end 
             
             if get(handles.xcorrRadio,'Value')
-                lineXcorrFit = polyfit(Distance,Xcorr,1);
+                [lineXcorrFit,Sxcorr] = polyfit(Distance,Xcorr,1);
                 PWV_Xcorr(entryCount+1) = 1/lineXcorrFit(1);
                 PWV_Xcorr(entryCount+2) = lineXcorrFit(1);
                 PWV_Xcorr(entryCount+3) = lineXcorrFit(2);
+                Sxcorr
             end 
             
-            lineAverageFit = polyfit(Distance,PWV_Average,1);
+            [lineAverageFit,Saverage] = polyfit(Distance,PWV_Average,1);
             PWV_Average(entryCount+1) = 1/lineAverageFit(1);
             PWV_Average(entryCount+2) = lineAverageFit(1);
             PWV_Average(entryCount+3) = lineAverageFit(2);
             PWV_Average = PWV_Average';
-            
+            Saverage
         else 
             if get(handles.ttpRadio,'Value')
                 PWV_Peak(entryCount+1) = Distance/TTPeak;
@@ -1307,7 +1439,7 @@ function ExportAnalysisButton_Callback(hObject, eventdata, handles)
                 PWV_Point(entryCount+3) = NaN;
             end 
             
-            if get(handles.ttfootRadio,'Value')
+            if get(handles.ttfRadio,'Value')
                 PWV_Foot(entryCount+1) = Distance/TTFoot;
                 PWV_Foot(entryCount+2) = NaN;
                 PWV_Foot(entryCount+3) = NaN;
@@ -1362,7 +1494,9 @@ function ExportAnalysisButton_Callback(hObject, eventdata, handles)
         clear PLANES Distance TTPeak TTPoint TTFoot TTUpstroke Xcorr 
         clear PWV_Peak PWV_Point PWV_Foot PWV_Upstroke PWV_Xcorr PWV_Average
     end 
-
+    
+    guidata(hObject, handles);
+    
     cd 'Data-DataAnalysis'
     flow = handles.flow;
     anatDatasets = handles.anatDatasets;
@@ -1396,12 +1530,10 @@ end
 function ttpData_CreateFcn(hObject, eventdata, handles)
 % --- TTPeak RADIO - CALLBACK
 function ttpRadio_Callback(hObject, eventdata, handles)
-    global startAnalyzing
-    
     if ~get(handles.ttpRadio,'Value')
         set(handles.ttpData,'String',' ');
     end 
-    if startAnalyzing
+    if handles.global.startAnalyzing
         ComputePWVButton_Callback(hObject, eventdata, handles);
     end 
 
@@ -1409,12 +1541,10 @@ function ttpRadio_Callback(hObject, eventdata, handles)
 function ttpointData_CreateFcn(hObject, eventdata, handles)
 % --- TTPoint RADIO - CALLBACK
 function ttpointRadio_Callback(hObject, eventdata, handles)
-    global startAnalyzing
-    
     if ~get(handles.ttpointRadio,'Value')
         set(handles.ttpointData,'String',' ');
     end 
-    if startAnalyzing
+    if handles.global.startAnalyzing
         ComputePWVButton_Callback(hObject, eventdata, handles);
     end 
 
@@ -1422,12 +1552,10 @@ function ttpointRadio_Callback(hObject, eventdata, handles)
 function ttuData_CreateFcn(hObject, eventdata, handles)
 % --- TTUpstroke RADIO - CALLBACK
 function ttuRadio_Callback(hObject, eventdata, handles)
-    global startAnalyzing
-    
     if ~get(handles.ttuRadio,'Value')
         set(handles.ttuData,'String',' ');
     end 
-    if startAnalyzing
+    if handles.global.startAnalyzing
         ComputePWVButton_Callback(hObject, eventdata, handles);
     end 
 
@@ -1435,12 +1563,10 @@ function ttuRadio_Callback(hObject, eventdata, handles)
 function ttfData_CreateFcn(hObject, eventdata, handles)
 % --- TTFoot RADIO - CALLBACK
 function ttfRadio_Callback(hObject, eventdata, handles)
-    global startAnalyzing
-    
     if ~get(handles.ttfRadio,'Value')
         set(handles.ttfData,'String',' ');
     end 
-    if startAnalyzing
+    if handles.global.startAnalyzing
         ComputePWVButton_Callback(hObject, eventdata, handles);
     end 
 
@@ -1448,12 +1574,10 @@ function ttfRadio_Callback(hObject, eventdata, handles)
 function xcorrData_CreateFcn(hObject, eventdata, handles)
 % --- Xcorr RADIO - CALLBACK
 function xcorrRadio_Callback(hObject, eventdata, handles)
-    global startAnalyzing
-    
     if ~get(handles.xcorrRadio,'Value')
         set(handles.xcorrData,'String',' ');
     end 
-    if startAnalyzing
+    if handles.global.startAnalyzing
         ComputePWVButton_Callback(hObject, eventdata, handles);
     end 
 
@@ -1496,9 +1620,9 @@ function distanceHeader6_CreateFcn(hObject, eventdata, handles)
 %%%%%%%%%%%% MY FUNCTIONS %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
 
+
 % --- Update Images in PLANE PLOT
 function updateImages(handles)
-    global spanUD spanLR zoomed 
     axes(handles.PlanePlot);
     
     planeNum = get(handles.PlanePopup,'Value');
@@ -1536,8 +1660,8 @@ function updateImages(handles)
         slice = images(:,:,sliceNum);
     end 
 
-    if zoomed
-        slice = slice(spanUD,spanLR);
+    if handles.global.zoomed
+        slice = slice(handles.global.spanUD,handles.global.spanLR);
     end 
 
     if ~isempty(handles.pcDatasets(planeNum).ROI)
@@ -1547,11 +1671,12 @@ function updateImages(handles)
         cla(handles.PlanePlot,'reset')
         imshow(slice,[])
     end 
+    
     clear dataset datasetNum images imageSet isPC planeNum slice steps 
+    
     
 % --- Update Images in ANATOMICAL PLOT
 function updateAnatImages(handles)
-    global zoomedAnat spanUDAnat spanLRAnat 
     axes(handles.AnatomicalPlot); %show image
     
     datasetNum = get(handles.AnatListbox,'Value');
@@ -1569,8 +1694,8 @@ function updateAnatImages(handles)
         anatSlice = images(:,:,sliceNum);
     end 
     
-    if zoomedAnat
-        anatSlice = anatSlice(spanUDAnat,spanLRAnat);
+    if handles.global.zoomedAnat
+        anatSlice = anatSlice(handles.global.spanUDAnat,handles.global.spanLRAnat);
     end
     
     if get(handles.ShowPlanesRadio,'Value') && handles.anatDatasets(datasetNum).sliceDim~=3
@@ -1583,17 +1708,17 @@ function updateAnatImages(handles)
     else 
        imshow(anatSlice,[]); 
     end 
+    set(handles.sliceNumText,'String',sliceNum);
+    
     clear anatSlice datasetNum dim3size i images pcRow sliceNum spanLRAnat spanUDAnat steps
 
     
 % --- "Time to" calculations (TTPeak, TTPoint, TTUpstroke, TTFoot, Xcorr)
 function flow = computeTTs(flow)
-    global startAnalyzing interpType pgShift
-
     numROIs = numel(flow);
     for i=1:numROIs
-        if startAnalyzing
-            switch interpType
+        if handles.global.startAnalyzing
+            switch handles.global.interpType
                 case 'None'
                     flowTemp = flow(i).Data.meanROI;
                 case 'Makima'
@@ -1614,7 +1739,7 @@ function flow = computeTTs(flow)
             flowTemp = flowTemp;
         end 
         
-        if pgShift
+        if handles.global.pgShift
             flowTemp = circshift(flowTemp,round(length(flowTemp)/2));
         end 
                 
@@ -1728,8 +1853,7 @@ function flow = computeTTs(flow)
         flow(i).Xcorr = Xcorr;
     end 
     
-
-    
+ 
 % --- Condense and organize flow data obtained from ROIs
 function flow = organizeFlowInfo(handles)
     count = 1;
@@ -1785,7 +1909,6 @@ function Y = interppolygon(X,N)
     
 % --- Plot Velocities    
 function plotVelocity(handles)
-    global interpType showErrorBars pgShift
     cla(handles.VelocityPlot,'reset')
     axes(handles.VelocityPlot);
     
@@ -1795,7 +1918,7 @@ function plotVelocity(handles)
     
     plot(times, zeros(1,length(times)) ,'Color','black','LineWidth',1.5);
     for i=1:count
-        switch interpType
+        switch handles.global.interpType
             case 'None'
                 flow = handles.flow(i).Data.meanROI;
                 stdev = handles.flow(i).Data.stdROI;
@@ -1814,19 +1937,19 @@ function plotVelocity(handles)
             otherwise
         end
         
-        if pgShift
+        if handles.global.pgShift
             flow = circshift(flow,round(length(flow)/2));
             stdev = circshift(stdev,round(length(stdev)/2));
         end 
         
         if mean(flow)<0
-            if showErrorBars
+            if handles.global.showErrorBars
                 hold on; errorbar(times,-1*flow,stdev);
             else
                 hold on; plot(times,-1*flow);
             end 
         else 
-            if showErrorBars
+            if handles.global.showErrorBars
                 hold on; errorbar(times,flow,stdev);
             else
                 hold on; plot(times,flow);
@@ -1836,6 +1959,8 @@ function plotVelocity(handles)
     legend(legendSet); hold off
     xlabel('Time (ms)'); ylabel('Mean Velocity in ROI (mm/s)');
     xlim([times(1),times(end)]);
+    
+    guidata(hObject,handles)
     clear legendSet count times flow stdev i
     
 
@@ -1869,6 +1994,7 @@ function [sigmoid,upslope,curvature,t1,t2,timeres] = sigFit(meanROI)
     %save upslope sigmoid curvature plots
     clear peak t times sigmoidModel c0 opts c 
     clear dt ddt dy ddy 
+    
     
 % --- Calculate derivative   
 function fPrime = derivative(f)

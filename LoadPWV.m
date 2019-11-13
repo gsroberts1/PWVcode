@@ -1,47 +1,47 @@
 function varargout = LoadPWV(varargin)
-% LOADPWV MATLAB code for LoadPWV.fig
-%      LOADPWV, by itself, creates a new LOADPWV or raises the existing
-%      singleton*.
-%
-%      H = LOADPWV returns the handle to a new LOADPWV or the handle to
-%      the existing singleton*.
-%
-%      LOADPWV('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in LOADPWV.M with the given input arguments.
-%
-%      LOADPWV('Property','Value',...) creates a new LOADPWV or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before LoadPWV_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to LoadPWV_OpeningFcn via varargin.
-%
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
-%
-% See also: GUIDE, GUIDATA, GUIHANDLES
+    % LOADPWV MATLAB code for LoadPWV.fig
+    %      LOADPWV, by itself, creates a new LOADPWV or raises the existing
+    %      singleton*.
+    %
+    %      H = LOADPWV returns the handle to a new LOADPWV or the handle to
+    %      the existing singleton*.
+    %
+    %      LOADPWV('CALLBACK',hObject,eventData,handles,...) calls the local
+    %      function named CALLBACK in LOADPWV.M with the given input arguments.
+    %
+    %      LOADPWV('Property','Value',...) creates a new LOADPWV or raises the
+    %      existing singleton*.  Starting from the left, property value pairs are
+    %      applied to the GUI before LoadPWV_OpeningFcn gets called.  An
+    %      unrecognized property name or invalid value makes property application
+    %      stop.  All inputs are passed to LoadPWV_OpeningFcn via varargin.
+    %
+    %      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+    %      instance to run (singleton)".
+    %
+    % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Edit the above text to modify the response to help LoadPWV
+    % Edit the above text to modify the response to help LoadPWV
 
-% Last Modified by GUIDE v2.5 26-Oct-2019 10:49:51
+    % Last Modified by GUIDE v2.5 26-Oct-2019 10:49:51
 
-% Begin initialization code - DO NOT EDIT
-gui_Singleton = 1;
-gui_State = struct('gui_Name',       mfilename, ...
-                   'gui_Singleton',  gui_Singleton, ...
-                   'gui_OpeningFcn', @LoadPWV_OpeningFcn, ...
-                   'gui_OutputFcn',  @LoadPWV_OutputFcn, ...
-                   'gui_LayoutFcn',  [] , ...
-                   'gui_Callback',   []);
-if nargin && ischar(varargin{1})
-    gui_State.gui_Callback = str2func(varargin{1});
-end
+    % Begin initialization code - DO NOT EDIT
+    gui_Singleton = 1;
+    gui_State = struct('gui_Name',       mfilename, ...
+                       'gui_Singleton',  gui_Singleton, ...
+                       'gui_OpeningFcn', @LoadPWV_OpeningFcn, ...
+                       'gui_OutputFcn',  @LoadPWV_OutputFcn, ...
+                       'gui_LayoutFcn',  [] , ...
+                       'gui_Callback',   []);
+    if nargin && ischar(varargin{1})
+        gui_State.gui_Callback = str2func(varargin{1});
+    end
 
-if nargout
-    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
-else
-    gui_mainfcn(gui_State, varargin{:});
-end
-% End initialization code - DO NOT EDIT
+    if nargout
+        [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+    else
+        gui_mainfcn(gui_State, varargin{:});
+    end
+    % End initialization code - DO NOT EDIT
 
 
 % --- Executes just before LoadPWV is made visible.
@@ -57,52 +57,63 @@ function LoadPWV_OpeningFcn(hObject, eventdata, handles, varargin)
 
     % Update handles structure
     guidata(hObject, handles);
+    
+    handles.global.preloaded = 0;
+    handles.anatDatasets.Names = '';
+    handles.anatDatasets.Data = 0;
+    handles.global.anatDataIter = 1;    
+    handles.pcDatasets.Names = '';
+    handles.pcDatasets.Data = 0;
+    handles.global.pcDataIter = 1;
+    handles.magDatasets.Names = '';
+    handles.magDatasets.Data = 0;
+    handles.global.magDataIter = 1;
+    handles.pcviprDatasets.Names = '';
+    handles.pcviprDatasets.Data = 0;
+    handles.global.pcviprDataIter = 1;
 
-    % UIWAIT makes LoadPWV wait for user response (see UIRESUME)
-    % uiwait(handles.figure1);
-
-
+    guidata(hObject, handles);
+    
 % --- Outputs from this function are returned to the command line.
 function varargout = LoadPWV_OutputFcn(hObject, eventdata, handles) 
-    % varargout  cell array for returning output args (see VARARGOUT);
-    % hObject    handle to figure
-    % eventdata  reserved - to be defined in a future version of MATLAB
-    % handles    structure with handles and user data (see GUIDATA)
-
-    % Get default command line output from handles structure
     varargout{1} = handles.output;
 
 
     
+
     
 %%%%%%%%%%%%%% PRELOAD CASE PANEL %%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % --- PRELOAD CASE CALLBACK
 function PreloadCaseButton_Callback(hObject, eventdata, handles)
-    global anatDataIter pcDataIter magDataIter pcviprDataIter preloaded
-
     [casefile, casefileDir] = uigetfile({'*.mat;','Useable Files (*.mat)';
        '*.mat','MAT-files (*.mat)'; ...
        '*.*',  'All Files (*.*)'}, 'Select the case file (NAME_pwvcasefile_DATE.mat)');
     load([casefileDir '\' casefile]);
-    set(handles.ListboxAnatomical,'String',{anatDatasets.Names});
-    set(handles.Listbox2DPC,'String',{pcDatasets.Names});
-    set(handles.Listbox2DMAG,'String',{magDatasets.Names});
-    set(handles.Listbox4DFlow,'String',{pcviprDatasets.Names});
+    
+    handles.anatDatasets = anatDatasets;
+    handles.pcDatasets = pcDatasets;
+    handles.magDatasets = magDatasets;
+    handles.pcviprDatasets = pcviprDatasets;
+    
+    set(handles.ListboxAnatomical,'String',{handles.anatDatasets.Names});
+    set(handles.Listbox2DPC,'String',{handles.pcDatasets.Names});
+    set(handles.Listbox2DMAG,'String',{handles.magDatasets.Names});
+    set(handles.Listbox4DFlow,'String',{handles.pcviprDatasets.Names});
 
-    disp('Case file loaded successfully');
     set(handles.ErrorMessageBar,'String','Case file loaded successfully')
 
-    anatDataIter = numel(anatDatasets)+1;
-    pcDataIter = numel(pcDatasets)+1;
-    magDataIter = numel(magDatasets)+1;
-    pcviprDataIter = numel(pcviprDatasets)+1;
-    preloaded = 1;
+    handles.global.anatDataIter = numel(anatDatasets) + 1;
+    handles.global.pcDataIter = numel(pcDatasets) + 1;
+    handles.global.magDataIter = numel(magDatasets) + 1;
+    handles.global.pcviprDataIter = numel(pcviprDatasets) + 1;
     
-    clear casefile casefileDir
+    clear casefile casefileDir    
+    guidata(hObject, handles);
 
 
     
+
     
 %%%%%%%%%%%%%% ANATOMICAL PANEL %%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -111,27 +122,16 @@ function DataNameAnatomical_Callback(hObject, eventdata, handles)
 
 % --- DATA NAME ANATOMICAL CREATE FUNCTION
 function DataNameAnatomical_CreateFcn(hObject, eventdata, handles)
-    global anatDatasets anatDataIter preloaded
-    
     if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
         set(hObject,'BackgroundColor','white');
     end
 
-    if isempty(preloaded)
-        anatDatasets.Names = '';
-        anatDatasets.Data = 0;
-        anatDataIter = 1;
-    end 
-
     
 % --- BUTTON LOAD ANATOMICAL CALLBACK
 function ButtonLoadAnatomical_Callback(hObject, eventdata, handles)
-    global anatDatasets anatDataIter
-
+    anatDataIter = handles.global.anatDataIter;
     set(handles.ErrorMessageBar,'String','')
     if isempty(get(handles.DataNameAnatomical,'String'))
-        disp('Name is required to load data!');
-        disp('Type a name into the text box and press the Load Data button.');
         set(handles.ErrorMessageBar,'String','Name is required to load data! Type a name into the text box and press the Load Data button.')
     else 
         name = get(handles.DataNameAnatomical,'String');
@@ -142,7 +142,7 @@ function ButtonLoadAnatomical_Callback(hObject, eventdata, handles)
         [~,~,extension] = fileparts(anatomicalFile);
         dirInfo = dir(fullfile(anatomicalDir,['*' extension]));
         if isequal(extension,'.dcm')
-            anatDatasets(anatDataIter).Info = dicominfo(fullfile(anatomicalDir,dirInfo(1).name));
+            handles.anatDatasets(anatDataIter).Info = dicominfo(fullfile(anatomicalDir,dirInfo(1).name));
             for i=1:length(dirInfo)
                 data(:,:,i) = single(dicomread(fullfile(anatomicalDir,dirInfo(i).name)));
             end        
@@ -151,19 +151,21 @@ function ButtonLoadAnatomical_Callback(hObject, eventdata, handles)
             data = single(struct2array(temp));
         end
 
-        if sum(strcmp({anatDatasets.Names},name))>0
+        if sum(strcmp({handles.anatDatasets.Names},name))>0
             set(handles.ErrorMessageBar,'String','This name has already been used, try loading again with a different name')
             set(handles.DataNameAnatomical,'String','')
         else 
             set(handles.ErrorMessageBar,'String',['"' name '" has been loaded successfully. Add another dataset OR select "Loading Complete" if finished loading data']);
-            anatDatasets(anatDataIter).Names = name;
-            anatDatasets(anatDataIter).Data = data;
-            anatDataIter = anatDataIter+1;
+            handles.anatDatasets(anatDataIter).Names = name;
+            handles.anatDatasets(anatDataIter).Data = data;
+            handles.global.anatDataIter = anatDataIter + 1;
             set(handles.DataNameAnatomical,'String','')
-            set(handles.ListboxAnatomical,'String',{anatDatasets.Names});
+            set(handles.ListboxAnatomical,'String',{handles.anatDatasets.Names});
         end 
     end 
+    
     clear name temp data dirInfo extension anatomicalFile anatomicalDir i
+    guidata(hObject, handles);
 
 % --- BUTTON LOAD ANATOMICAL CREATE FUNCTION
 function ButtonLoadAnatomical_CreateFcn(hObject, eventdata, handles)
@@ -181,13 +183,14 @@ function ListboxAnatomical_CreateFcn(hObject, eventdata, handles)
 
 % --- REMOVE ANATOMICAL CALLBACK
 function RemoveAnatomical_Callback(hObject, eventdata, handles)
-    global anatDatasets anatDataIter
     index = get(handles.ListboxAnatomical, 'value');
-    anatDatasets(index) = [];
+    handles.anatDatasets(index) = [];
     set(handles.ListboxAnatomical,'Value',1);
-    set(handles.ListboxAnatomical,'String',{anatDatasets.Names});
-    anatDataIter = anatDataIter-1;
-    clear index 
+    set(handles.ListboxAnatomical,'String',{handles.anatDatasets.Names});
+    handles.global.anatDataIter = handles.global.anatDataIter - 1;
+    
+    clear index
+    guidata(hObject, handles);
 
 % --- REMOVE ANATOMICAL CREATE FUNCTION
 function RemoveAnatomical_CreateFcn(hObject, eventdata, handles)
@@ -203,27 +206,18 @@ function DataName2DPC_Callback(hObject, eventdata, handles)
 
 % --- 2D PC DATA NAME CREATE FUNCTION
 function DataName2DPC_CreateFcn(hObject, eventdata, handles)
-    global pcDatasets pcDataIter preloaded
     if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
         set(hObject,'BackgroundColor','white');
-    end
-
-    if isempty(preloaded)
-        pcDatasets.Names = '';
-        pcDatasets.Data = 0;
-        pcDataIter = 1;
     end
     
     
 % --- BUTTON LOAD 2DPC CALLBACK
 function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
-    global pcDatasets pcDataIter
+    pcDataIter = handles.global.pcDataIter;
     set(handles.ErrorMessageBar,'String','')
     if isempty(get(handles.DataName2DPC,'String'))
-        disp('Name is required to load data!');
-        disp('Type a name into the text box and press the Load Data button.');
         set(handles.ErrorMessageBar,'String','Name is required to load data! Type a name into the text box and press the Load Data button.')
-    elseif sum(strcmp({pcDatasets.Names},get(handles.DataName2DPC,'String')))>0
+    elseif sum(strcmp({handles.pcDatasets.Names},get(handles.DataName2DPC,'String')))>0
         set(handles.ErrorMessageBar,'String','This name has already been used, try loading again with a different name')
         set(handles.DataName2DPC,'String','')
     else 
@@ -235,22 +229,22 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
         [~,~,extension] = fileparts(pcFile);
         dirInfo = dir(fullfile(pcDir,['*' extension]));
         if isequal(extension,'.dcm')
-            pcDatasets(pcDataIter).Info = dicominfo(fullfile(pcDir,dirInfo(1).name));
-            pcDatasets(pcDataIter).isDICOM = 1;
+            handles.pcDatasets(pcDataIter).Info = dicominfo(fullfile(pcDir,dirInfo(1).name));
+            handles.pcDatasets(pcDataIter).isDICOM = 1;
             for i=1:length(dirInfo)
                 temp(:,:,i) = single(dicomread(fullfile(pcDir,dirInfo(i).name)));
             end   
             data.v = temp(:,:,1:floor(length(dirInfo)/2)); %%maybe change to velocity
             data.mag = temp(:,:,floor(length(dirInfo)/2)+1:end);
-            VMEAN = BGPhaseCorrect(data.mag,data.v);
+            VMEAN = BGPhaseCorrect(data.v);
         else
             fid = fopen([pcDir '\pcvipr_header.txt'], 'r');
             dataArray = textscan(fid, '%s%s%[^\n\r]', 'Delimiter', ' ', 'MultipleDelimsAsOne', true, 'ReturnOnError', false);
             fclose(fid);
             dataArray{1,2} = cellfun(@str2num,dataArray{1,2}(:), 'UniformOutput', false);
             pcviprHeader = cell2struct(dataArray{1,2}(:), dataArray{1,1}(:), 1);
-            pcDatasets(pcDataIter).Info = pcviprHeader;
-            pcDatasets(pcDataIter).isDICOM = 0;
+            handles.pcDatasets(pcDataIter).Info = pcviprHeader;
+            handles.pcDatasets(pcDataIter).isDICOM = 0;
             resx = pcviprHeader.matrixx;  
             resy = pcviprHeader.matrixy;  
             nframes = pcviprHeader.frames;      
@@ -274,15 +268,16 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
             data.VMEAN = VMEAN;
         end
     set(handles.ErrorMessageBar,'String',['"' name '" has been loaded successfully. Add another dataset OR select "Loading Complete" if finished loading data']);
-    pcDatasets(pcDataIter).Names = name;
-    pcDatasets(pcDataIter).Data = data;
-    pcDataIter = pcDataIter+1;
+    handles.pcDatasets(pcDataIter).Names = name;
+    handles.pcDatasets(pcDataIter).Data = data;
+    handles.global.pcDataIter = pcDataIter + 1;
     set(handles.DataName2DPC,'String','')
-    set(handles.Listbox2DPC,'String',{pcDatasets.Names});
+    set(handles.Listbox2DPC,'String',{handles.pcDatasets.Names});
     end 
     
     clear name pcFile pcDir cd mag v CD MAG VMEAN resx resy pcviprHeader 
     clear dataArray nframes dirInfo temp i j fid ans extension data
+    guidata(hObject, handles);
 
 % --- BUTTON LOAD 2DPC CREATE FUNCTION
 function ButtonLoad2DPC_CreateFcn(hObject, eventdata, handles)
@@ -300,16 +295,18 @@ function Listbox2DPC_CreateFcn(hObject, eventdata, handles)
 
 % --- REMOVE 2DPC CALLBACK
 function Remove2DPC_Callback(hObject, eventdata, handles)
-    global pcDatasets pcDataIter
     index = get(handles.Listbox2DPC, 'value');
-    pcDatasets(index) = [];
+    handles.global.pcDatasets(index) = [];
     set(handles.Listbox2DPC,'Value',1);
-    set(handles.Listbox2DPC,'String',{pcDatasets.Names});
-    pcDataIter = pcDataIter-1;
+    set(handles.Listbox2DPC,'String',{handles.global.pcDatasets.Names});
+    handles.global.pcDataIter = handles.global.pcDataIter - 1;
+    
     clear index
-
+    guidata(hObject, handles);
+        
 % --- REMOVE 2DPC CREATE FUNCTION
 function Remove2DPC_CreateFcn(hObject, eventdata, handles)
+
 
 
 
@@ -321,26 +318,17 @@ function DataName2DMAG_Callback(hObject, eventdata, handles)
 
 % --- DATA NAME 2DMAG CREATE FUNCTION
 function DataName2DMAG_CreateFcn(hObject, eventdata, handles)
-    global magDatasets magDataIter preloaded
     if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
         set(hObject,'BackgroundColor','white');
     end
 
-    if isempty(preloaded)
-        magDatasets.Names = '';
-        magDatasets.Data = 0;
-        magDataIter = 1;   
-    end 
-
     
 % --- BUTTON LOAD 2DMAG CALLBACK
 function ButtonLoad2DMAG_Callback(hObject, eventdata, handles)
-    global magDatasets magDataIter
+    magDataIter = handles.global.magDataIter;
     set(handles.ErrorMessageBar,'String','')
 
     if isempty(get(handles.DataName2DMAG,'String'))
-        disp('Name is required to load data!');
-        disp('Type a name into the text box and press the Load Data button.');
         set(handles.ErrorMessageBar,'String','Name is required to load data! Type a name into the text box and press the Load Data button.')
     else 
         name = get(handles.DataName2DMAG,'String');
@@ -352,7 +340,7 @@ function ButtonLoad2DMAG_Callback(hObject, eventdata, handles)
         dirInfo = dir(fullfile(magDir,['*' extension]));
         
         if isequal(extension,'.dcm')
-            magDatasets(magDataIter).Info = dicominfo(fullfile(magDir,dirInfo(1).name));
+            handles.magDatasets(magDataIter).Info = dicominfo(fullfile(magDir,dirInfo(1).name));
             for i=1:length(dirInfo)
                 data(:,:,i) = single(dicomread(fullfile(magDir,dirInfo(i).name)));
             end        
@@ -361,19 +349,21 @@ function ButtonLoad2DMAG_Callback(hObject, eventdata, handles)
             data = single(struct2array(temp));
         end
         
-        if sum(strcmp({magDatasets.Names},name))>0
+        if sum(strcmp({handles.magDatasets.Names},name))>0
             set(handles.ErrorMessageBar,'String','This name has already been used, try loading again with a different name')
             set(handles.DataName2DMAG,'String','')
         else 
             set(handles.ErrorMessageBar,'String',['"' name '" has been loaded successfully. Add another dataset OR select "Loading Complete" if finished loading data']);
-            magDatasets(magDataIter).Names = name;
-            magDatasets(magDataIter).Data = data;
-            magDataIter = magDataIter+1;
+            handles.magDatasets(magDataIter).Names = name;
+            handles.magDatasets(magDataIter).Data = data;
+            handles.global.magDataIter = magDataIter + 1;
             set(handles.DataName2DMAG,'String','')
-            set(handles.Listbox2DMAG,'String',{magDatasets.Names});
+            set(handles.Listbox2DMAG,'String',{handles.magDatasets.Names});
         end 
     end 
+    
     clear name data temp dirInfo extension magFile magDir i
+    guidata(hObject, handles);
 
 % --- BUTTON LOAD 2DMAG CREATE FUNCTION
 function ButtonLoad2DMAG_CreateFcn(hObject, eventdata, handles)
@@ -391,16 +381,18 @@ function Listbox2DMAG_CreateFcn(hObject, eventdata, handles)
 
 % --- REMOVE 2DMAG CALLBACK
 function Remove2DMAG_Callback(hObject, eventdata, handles)
-    global magDatasets magDataIter
     index = get(handles.Listbox2DMAG, 'value');
-    magDatasets(index) = [];
+    handles.global.magDatasets(index) = [];
     set(handles.Listbox2DMAG,'Value',1);
-    set(handles.Listbox2DMAG,'String',{magDatasets.Names});
-    magDataIter = magDataIter-1;
+    set(handles.Listbox2DMAG,'String',{handles.global.magDatasets.Names});
+    handles.global.magDataIter = handles.global.magDataIter - 1;
+    
     clear index 
+    guidata(hObject, handles);
 
 % --- REMOVE 2DMAG CREATE FUNCTION
 function Remove2DMAG_CreateFcn(hObject, eventdata, handles)
+
 
 
 
@@ -412,26 +404,17 @@ function DataName4DFlow_Callback(hObject, eventdata, handles)
 
 % --- DATA NAME 4D FLOW CREATE FUNCTION
 function DataName4DFlow_CreateFcn(hObject, eventdata, handles)
-    global pcviprDatasets pcviprDataIter preloaded
     if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
         set(hObject,'BackgroundColor','white');
-    end
-
-    if isempty(preloaded)
-        pcviprDatasets.Names = '';
-        pcviprDatasets.Data = 0;
-        pcviprDataIter = 1;
     end
 
     
 % --- BUTTON LOAD 4D FLOW CALLBACK
 function ButtonLoad4DFlow_Callback(hObject, eventdata, handles)
-    global pcviprDatasets pcviprDataIter
+    pcviprDataIter = handles.global.pcviprDataIter;
     set(handles.ErrorMessageBar,'String','')
 
     if isempty(get(handles.DataName4DFlow,'String'))
-        disp('Name is required to load data!');
-        disp('Type a name into the text box and press the Load Data button.');
         set(handles.ErrorMessageBar,'String','Name is required to load data! Type a name into the text box and press the Load Data button.')
     else 
         name = get(handles.DataName4DFlow,'String');
@@ -443,7 +426,7 @@ function ButtonLoad4DFlow_Callback(hObject, eventdata, handles)
         dirInfo = dir(fullfile(pcviprDir,['*' extension]));
         
         if isequal(extension,'.dcm')
-            pcviprDatasets(pcviprDataIter).Info = dicominfo(fullfile(pcDir,dirInfo(1).name));
+            handles.pcviprDatasets(pcviprDataIter).Info = dicominfo(fullfile(pcDir,dirInfo(1).name));
             for i=1:length(dirInfo)
                 data(:,:,i) = single(dicomread(fullfile(pcviprDir,dirInfo(i).name)));
             end        
@@ -452,19 +435,21 @@ function ButtonLoad4DFlow_Callback(hObject, eventdata, handles)
             data = single(struct2array(temp));
         end
         
-        if sum(strcmp({pcviprDatasets.Names},name))>0
+        if sum(strcmp({handles.pcviprDatasets.Names},name))>0
             set(handles.ErrorMessageBar,'String','This name has already been used, try loading again with a different name')
             set(handles.DataName4DFlow,'String','')
         else 
             set(handles.ErrorMessageBar,'String',['"' name '" has been loaded successfully. Add another dataset OR select "Loading Complete" if finished loading data']);
-            pcviprDatasets(pcviprDataIter).Names = name;
-            pcviprDatasets(pcviprDataIter).Data = data;
-            pcviprDataIter = pcviprDataIter+1;
+            handles.pcviprDatasets(pcviprDataIter).Names = name;
+            handles.pcviprDatasets(pcviprDataIter).Data = data;
+            handles.global.pcviprDataIter = pcviprDataIter + 1;
             set(handles.DataName4DFlow,'String','')
-            set(handles.Listbox4DFlow,'String',{pcviprDatasets.Names});
+            set(handles.Listbox4DFlow,'String',{handles.pcviprDatasets.Names});
         end 
     end 
+    
     clear name pcviprFile pcviprDir extension dirInfo temp data i 
+    guidata(hObject, handles);
 
 % --- BUTTON LOAD 4D FLOW CREATE FUNCTION
 function ButtonLoad4DFlow_CreateFcn(hObject, eventdata, handles)
@@ -482,16 +467,18 @@ function Listbox4DFlow_CreateFcn(hObject, eventdata, handles)
 
 % --- REMOVE 4D FLOW CALLBACK
 function Remove4DFlow_Callback(hObject, eventdata, handles)
-    global pcviprDatasets pcviprDataIter
     index = get(handles.Listbox4DFlow, 'value');
-    pcviprDatasets(index) = [];
+    handles.global.pcviprDatasets(index) = [];
     set(handles.Listbox4DFlow,'Value',1);
-    set(handles.Listbox4DFlow,'String',{pcviprDatasets.Names});
-    pcviprDataIter = pcviprDataIter-1;
+    set(handles.Listbox4DFlow,'String',{handles.global.pcviprDatasets.Names});
+    handles.global.pcviprDataIter = handles.global.pcviprDataIter - 1;
+    
     clear index 
+    guidata(hObject, handles);
 
 % --- REMOVE 4D FLOW CREATE FUNCTION
 function Remove4DFlow_CreateFcn(hObject, eventdata, handles)
+
 
 
 
@@ -510,13 +497,14 @@ function CaseName_CreateFcn(hObject, eventdata, handles)
     
 % --- SAVE CASE BUTTON CALLBACK
 function SaveCaseButton_Callback(hObject, eventdata, handles)
-    global anatDatasets pcDatasets magDatasets pcviprDatasets
+    anatDatasets = handles.anatDatasets;
+    pcDatasets = handles.pcDatasets;
+    magDatasets = handles.magDatasets;
+    pcviprDatasets = handles.pcviprDatasets;
+    
     if isempty(get(handles.CaseName,'String'))
-        disp('Name is required to save data!');
-        disp('Type a name into the text box and press the Save Case File button.');
         set(handles.ErrorMessageBar,'String','Name is required to save data! Type a name into the text box and press the Save Case File button.')
     else
-        disp('Select the directory where you will save the Case File.')
         set(handles.ErrorMessageBar, 'String', 'Select the directory where you will save the Case File.');
         casefileDir = uigetdir('C:\','Select the directory where you will save the Case File.');
         casename = get(handles.CaseName,'String');
@@ -527,8 +515,11 @@ function SaveCaseButton_Callback(hObject, eventdata, handles)
         filenameWithPath = [casefileDir '\' filename];
         save(filenameWithPath,'anatDatasets','pcDatasets','magDatasets','pcviprDatasets');
         set(handles.ErrorMessageBar,'String','Data saved successfully');
+        set(handles.CaseName,'');
     end 
+    
     clear casefileDir casename date chopData filename filenameWithPath
+    guidata(hObject, handles);
 
     
 % --- ERROR MESSAGE BAR CALLBACK
@@ -543,18 +534,13 @@ function ErrorMessageBar_CreateFcn(hObject, eventdata, handles)
 
 % --- COMPLETE LOADING BUTTON CALLBACK
 function ButtonCompleteLoading_Callback(hObject, eventdata, handles)
-    global anatDataIter pcDataIter
-    global anatDatasets magDatasets pcDatasets
-    if anatDataIter==1
-        disp('Anatomical datasets required to complete loading process.');
+    if handles.global.anatDataIter==1
         set(handles.ErrorMessageBar,'String','Anatomical datasets required to complete loading process.');
-    elseif pcDataIter==1
-        disp('2D PC datasets required to complete loading process.');
+    elseif handles.global.pcDataIter==1
         set(handles.ErrorMessageBar,'String','2D PC datasets required to complete loading process.');
     else
-        disp('Loading Process Complete...');
         set(handles.ErrorMessageBar,'String','Loading Process Complete...');
-        AnalyzePWV(anatDatasets,pcDatasets,magDatasets)
+        AnalyzePWV(handles.anatDatasets,handles.pcDatasets,handles.magDatasets)
     end 
 
 % --- COMPLETE LOADING BUTTON CREATE FUNCTION
@@ -571,7 +557,7 @@ function v = load_dat(name, res)
 
     [fid,errmsg]= fopen(name,'r');
     if fid < 0  % If name does not exist in directory
-        disp(['Error Opening Data : ',errmsg]);
+        set(handles.ErrorMessageBar,'String',['Error Opening Data : ',errmsg]);
     end
 
     % Reads in as short, reshapes by image res.
@@ -580,7 +566,7 @@ function v = load_dat(name, res)
     clear fid errmsg 
 
 % Perform 2D background phase correction
-function vmean = BGPhaseCorrect(mag,v)
+function vmean = BGPhaseCorrect(v)
 vmean = mean(abs(v),3);
 vmax = max(abs(v),[],3);
 
@@ -600,7 +586,6 @@ y0 = 1:size(mask,2);
 fits = c(1) + c(2).*x + c(3).*y + c(4).*(x.^2) + c(5).*x.*y + c(6).*(y.^2) ...
      + c(7).*(x.^3) + c(8).*(x.^2).*y + c(9).*x.*(y.^2) + c(10).*(y.^3); 
 vmean = vmean-fits;
-
 
 
 
