@@ -1,4 +1,4 @@
---- Turn images indices into physical positions (in 3D space)
+%--- Turn images indices into physical positions (in 3D space)
 function[truePositions,rotationMatrix] = getTruePosition(info,sliceNum)
     if isfield(info,'ImageOrientationPatient') % if dicom
         originShift = [info.ImagePositionPatient;1]; % origin is top left corner of image

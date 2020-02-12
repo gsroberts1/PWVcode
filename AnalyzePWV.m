@@ -688,13 +688,10 @@ function UnzoomAnatomicalButton_Callback(hObject, eventdata, handles)
 
 % --- DRAW CENTERLINE - CALLBACK
 function DrawCenterlineButton_Callback(hObject, eventdata, handles)
-%         axes(handles.AnatomicalPlot); 
-%         if isempty(get(handles.range1Edit,'String')) || isempty(get(handles.range1Edit,'String'))
-%             set(handles.MessageBar,'String','Range is required to draw centerlines')
-%         else 
-        
-            
-            
+        axes(handles.AnatomicalPlot); 
+        if isempty(get(handles.range1Edit,'String')) || isempty(get(handles.range1Edit,'String'))
+            set(handles.MessageBar,'String','Range is required to draw centerlines')
+        else 
         ShowPlanesRadio_Callback(hObject, eventdata, handles);
         
         set(handles.ShowPlanesRadio,'Value',1);
@@ -730,82 +727,82 @@ function DrawCenterlineButton_Callback(hObject, eventdata, handles)
         
         
         
-%         axes(handles.AnatomicalPlot);
-%         images = handles.anatDatasets(datasetNum).Data(:,:,range1:range2);
-%         x = []; y = []; z = [];
-%         for i=1:size(images,3)
-%             image = images(:,:,i);
-%             imshow(image,[]);
-%             [xTemp,yTemp] = getpts();
-%             zTemp = i.*(ones(size(xTemp,1),1));
-%             x = [x; xTemp];
-%             y = [y; yTemp];
-%             z = [z; zTemp];
-%         end 
-%         
-%         figure; scatter(y,x); xline(127); xline(325);
-%         line1 = drawpolyline;
-%         figure; scatter(y,z);  xline(127); xline(325);
-%         line2 = drawpolyline;
-%                 
-%         splinePositions1 = interppolygon(line1.Position,150);
-%         splinePositions2 = interppolygon(line2.Position,150);
-%         %NEED TO EDIT IF CORONAL
-%         splineLine(:,1) = flipud(splinePositions2(:,2)); %x physical
-%         splineLine(:,2) = splinePositions1(:,2); %y
-%         splineLine(:,3) = splinePositions1(:,1); %z
-%         figure; scatter3(y,x,z); hold on; 
-%         scatter3(splineLine(:,3),splineLine(:,2),splineLine(:,1),'filled');
-%         xlabel('x'); ylabel('y'); zlabel('slice');
-%         x = linspace( min(splineLine(:,2))-50, max(splineLine(:,2))+50, 512);
-%         y = linspace( min(splineLine(:,1))-2, max(splineLine(:,1))+2, 512);
-%         [X,Y] = meshgrid(x,y);
-%         for i=1:numel(handles.flow)
-%             Z = (handles.flow(i).planeLineRow).*ones(size(X));
-%             hold on; surf(Z,X,Y);
-%         end 
-%         hold off;
+        axes(handles.AnatomicalPlot);
+        images = handles.anatDatasets(datasetNum).Data(:,:,range1:range2);
+        x = []; y = []; z = [];
+        for i=1:size(images,3)
+            image = images(:,:,i);
+            imshow(image,[]);
+            [xTemp,yTemp] = getpts();
+            zTemp = i.*(ones(size(xTemp,1),1));
+            x = [x; xTemp];
+            y = [y; yTemp];
+            z = [z; zTemp];
+        end 
+        
+        figure; scatter(y,x); xline(127); xline(325);
+        line1 = drawpolyline;
+        figure; scatter(y,z);  xline(127); xline(325);
+        line2 = drawpolyline;
+                
+        splinePositions1 = interppolygon(line1.Position,150);
+        splinePositions2 = interppolygon(line2.Position,150);
+        %NEED TO EDIT IF CORONAL
+        splineLine(:,1) = flipud(splinePositions2(:,2)); %x physical
+        splineLine(:,2) = splinePositions1(:,2); %y
+        splineLine(:,3) = splinePositions1(:,1); %z
+        figure; scatter3(y,x,z); hold on; 
+        scatter3(splineLine(:,3),splineLine(:,2),splineLine(:,1),'filled');
+        xlabel('x'); ylabel('y'); zlabel('slice');
+        x = linspace( min(splineLine(:,2))-50, max(splineLine(:,2))+50, 512);
+        y = linspace( min(splineLine(:,1))-2, max(splineLine(:,1))+2, 512);
+        [X,Y] = meshgrid(x,y);
+        for i=1:numel(handles.flow)
+            Z = (handles.flow(i).planeLineRow).*ones(size(X));
+            hold on; surf(Z,X,Y);
+        end 
+        hold off;
 
-%         figure; scatter3(splineLine(:,3),splineLine(:,2),splineLine(:,1),30,'filled','g'); hold on;
-%         xlabel('x'); ylabel('y'); zlabel('slice');
-%         image1 = handles.pcDatasets(1).Data.MAG;
-%         image1 = image1(100:412,100:412);
-%         image2 = handles.pcDatasets(2).Data.MAG;
-%         image2 = image2(100:412,100:412);
-%         
-%         x1 = (linspace( min(splineLine(:,2))-80, max(splineLine(:,2))+80, size(image1,1))*1.4)-110;
-%         x2 = linspace( min(splineLine(:,2))-80, max(splineLine(:,2))+80, size(image2,1))+15;
-%         
-%         y1 = linspace( min(splineLine(:,1))-8, max(splineLine(:,1))+8, size(image1,1))-0.7;
-%         y1 = repmat(y1,size(image1,1),1);
-%         
-%         y2 = linspace( min(splineLine(:,1))-8, max(splineLine(:,1))+8, size(image2,1));
-%         y2 = repmat(y2,size(image2,1),1)-0.25;
-%         
-%         z1 = (handles.flow(1).planeLineRow).*ones(1,length(x1));
-%         z2 = (handles.flow(3).planeLineRow).*ones(1,length(x2));
-%         
-%         surf(z1,x1,y1,image1); colormap('gray'); hold on;
-%         surf(z2,x2,y2,image2); colormap('gray'); shading interp
-% 
-%         
-%         distances = zeros(1,length(splinePositions1)-1);
-%         for i=1:length(splinePositions1)-1
-%             xSquare = (sliceres.*(splineLine(i,1)-splineLine(i+1,1))).^2;
-%             ySquare = (xres.*(splineLine(i,2)-splineLine(i+1,2))).^2;
-%             zSquare = (yres.*(splineLine(i,3)-splineLine(i+1,3))).^2;
-%             distances(i) = sqrt( xSquare + ySquare + zSquare );
-%         end 
-%         distances(end+1)=0;
-%         handles.anatDatasets(datasetNum).Distances = distances;
-%         handles.anatDatasets(datasetNum).Centerline = splineLine;
-% 
-%         clear datasetNum yres anatRotation colsRunningDir spanZ i w mydlg 
-%         clear key planeLinePhysical planeLineRow matrixx fovx xres matrixy 
-%         clear fovy yres distances splinePositions
-%         
-%         guidata(hObject,handles);
-%         updateImages(handles);
+        figure; scatter3(splineLine(:,3),splineLine(:,2),splineLine(:,1),30,'filled','g'); hold on;
+        xlabel('x'); ylabel('y'); zlabel('slice');
+        image1 = handles.pcDatasets(1).Data.MAG;
+        image1 = image1(100:412,100:412);
+        image2 = handles.pcDatasets(2).Data.MAG;
+        image2 = image2(100:412,100:412);
+        
+        x1 = (linspace( min(splineLine(:,2))-80, max(splineLine(:,2))+80, size(image1,1))*1.4)-110;
+        x2 = linspace( min(splineLine(:,2))-80, max(splineLine(:,2))+80, size(image2,1))+15;
+        
+        y1 = linspace( min(splineLine(:,1))-8, max(splineLine(:,1))+8, size(image1,1))-0.7;
+        y1 = repmat(y1,size(image1,1),1);
+        
+        y2 = linspace( min(splineLine(:,1))-8, max(splineLine(:,1))+8, size(image2,1));
+        y2 = repmat(y2,size(image2,1),1)-0.25;
+        
+        z1 = (handles.flow(1).planeLineRow).*ones(1,length(x1));
+        z2 = (handles.flow(3).planeLineRow).*ones(1,length(x2));
+        
+        surf(z1,x1,y1,image1); colormap('gray'); hold on;
+        surf(z2,x2,y2,image2); colormap('gray'); shading interp
+
+        
+        distances = zeros(1,length(splinePositions1)-1);
+        for i=1:length(splinePositions1)-1
+            xSquare = (sliceres.*(splineLine(i,1)-splineLine(i+1,1))).^2;
+            ySquare = (xres.*(splineLine(i,2)-splineLine(i+1,2))).^2;
+            zSquare = (yres.*(splineLine(i,3)-splineLine(i+1,3))).^2;
+            distances(i) = sqrt( xSquare + ySquare + zSquare );
+        end 
+        distances(end+1)=0;
+        handles.anatDatasets(datasetNum).Distances = distances;
+        handles.anatDatasets(datasetNum).Centerline = splineLine;
+
+        clear datasetNum yres anatRotation colsRunningDir spanZ i w mydlg 
+        clear key planeLinePhysical planeLineRow matrixx fovx xres matrixy 
+        clear fovy yres distances splinePositions
+        
+        guidata(hObject,handles);
+        updateImages(handles);
 
 % % %         if isempty(handles.anatDatasets(datasetNum).Centerline)
 % % %             mydlg = warndlg('Press enter when the centerline is drawn');
@@ -862,14 +859,14 @@ function DrawCenterlineButton_Callback(hObject, eventdata, handles)
 % % %         else
 % % %             fprintf('A Centerline has already been placed!\n');
 % % %         end 
-%         end
+        end
     
-    datasetNum = get(handles.AnatListbox,'Value');
-    oldData = load('D:\PWV\volunteers\Mulan-Volunteer_PWV_01833_2019-11-02-h11\01833_00008_pwv-radial_Aao_PG\2500proj\Data-DataAnalysis\anatDatasets.mat');
-    handles.anatDatasets(datasetNum).Distances = oldData.anatDatasets(datasetNum).Distances;
-    handles.anatDatasets(datasetNum).Centerline = oldData.anatDatasets(datasetNum).Centerline;
-    guidata(hObject,handles);
-    clear oldData  
+%     datasetNum = get(handles.AnatListbox,'Value');
+%     oldData = load('D:\PWV\volunteers\Mulan-Volunteer_PWV_01833_2019-11-02-h11\01833_00008_pwv-radial_Aao_PG\2500proj\Data-DataAnalysis\anatDatasets.mat');
+%     handles.anatDatasets(datasetNum).Distances = oldData.anatDatasets(datasetNum).Distances;
+%     handles.anatDatasets(datasetNum).Centerline = oldData.anatDatasets(datasetNum).Centerline;
+%     guidata(hObject,handles);
+%     clear oldData  
     
 % --- DELETE CENTERLINE - CALLBACK
 function DeleteCenterlineButton_Callback(hObject, eventdata, handles)
@@ -969,7 +966,7 @@ function ComputePWVButton_Callback(hObject, eventdata, handles)
     end 
     
     guidata(hObject,handles);
-    flow = computeTTs(handles.flow);
+    flow = computeTTs(handles);
     handles.flow = flow;
     guidata(hObject,handles);
     
@@ -1306,7 +1303,7 @@ function ExportAnalysisButton_Callback(hObject, eventdata, handles)
 
     for t=1:length(interpTypes)
         handles.global.interpType = interpTypes{t};
-        flow = computeTTs(handles.flow);
+        flow = computeTTs(handles);
         Distance = []; TTPeak = []; TTPoint = []; TTFoot = []; TTUpstroke = []; Xcorr = [];
         
         for i = 1:numel(flow)
@@ -1714,7 +1711,8 @@ function updateAnatImages(handles)
 
     
 % --- "Time to" calculations (TTPeak, TTPoint, TTUpstroke, TTFoot, Xcorr)
-function flow = computeTTs(flow)
+function flow = computeTTs(handles)
+    flow = handles.flow; 
     numROIs = numel(flow);
     for i=1:numROIs
         if handles.global.startAnalyzing
