@@ -88,6 +88,7 @@ function PreloadCaseButton_Callback(hObject, eventdata, handles)
        '*.mat','MAT-files (*.mat)'; ...
        '*.*',  'All Files (*.*)'}, 'Select the case file (NAME_pwvcasefile_DATE.mat)');
     load([casefileDir '\' casefile]); %load casefile
+    cd(casefileDir);
     
     % Place loaded datasets back into current handles
     handles.anatDatasets = anatDatasets; 
@@ -102,17 +103,17 @@ function PreloadCaseButton_Callback(hObject, eventdata, handles)
 
     handles.global.anatDataIter = numel(anatDatasets) + 1;
     % If only 1 entry (=0), no data was loaded. Subtract this from the iter
-    if numel(anatDatasets.Data)==1 
+    if numel(anatDatasets(1).Data)==1 
         handles.global.anatDataIter = handles.global.anatDataIter - 1;
     end 
     
     handles.global.pcDataIter = numel(pcDatasets) + 1;
-    if numel(pcDatasets.Data)==1
+    if ~isstruct(pcDatasets(1).Data(1))
         handles.global.pcDataIter = handles.global.pcDataIter - 1;
     end 
     
     handles.global.magDataIter = numel(magDatasets) + 1;
-    if numel(magDatasets.Data)==1
+    if ~isstruct(magDatasets(1).Data(1))
         handles.global.magDataIter = handles.global.magDataIter - 1;
     end 
       
@@ -168,6 +169,7 @@ function ButtonLoadAnatomical_Callback(hObject, eventdata, handles)
                 ['"' name '" has been loaded successfully. Add another dataset OR select "Loading Complete" if finished loading data']);
             handles.anatDatasets(anatDataIter).Names = name; %add name to list
             handles.anatDatasets(anatDataIter).Data = data; %add data to handles
+            handles.anatDatasets(anatDataIter).RootDir = anatomicalDir;
             handles.global.anatDataIter = anatDataIter + 1; %move iter up 1
             set(handles.DataNameAnatomical,'String','') %erase name
             set(handles.ListboxAnatomical,'String',{handles.anatDatasets.Names}); %update listbox names
@@ -240,12 +242,14 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
             handles.pcDatasets(pcDataIter).Info = dicominfo(fullfile(pcDir,dirInfo(1).name)); %get dicom metadata (from 1st dicom)
             for i=1:length(dirInfo)
                 temp(:,:,i) = single(dicomread(fullfile(pcDir,dirInfo(i).name))); %read dicoms and cast to single
-            end   
-            data.v = temp(:,:,1:floor(length(dirInfo)/2)); %velocity is first half of images
-            data.V = mean(temp,3); %time-averaged velocity
-            data.mag = temp(:,:,floor(length(dirInfo)/2)+1:end); %magnitude is last half
-            data.MAG = mean(temp,3); %time-averaged magnitude
-            %VMEAN = BGPhaseCorrect(data.v);
+            end  
+            mag = temp(:,:,floor(length(dirInfo)/2)+1:end); %magnitude is last half
+            v = temp(:,:,1:floor(length(dirInfo)/2)); %velocity is first half of images
+            data.MAG = mean(mag,3); %time-averaged magnitude
+            %data.VMEAN = BGPhaseCorrect(data.v);
+            data.VMEAN = mean(v,3); %time-averaged velocity
+            data.mag = mag;
+            data.v = v;
         else
             fid = fopen([pcDir '\pcvipr_header.txt'], 'r'); %open header
             dataArray = textscan(fid,'%s%s%[^\n\r]','Delimiter',' ', ...
@@ -262,22 +266,23 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
             data.VMEAN = load_dat(fullfile(pcDir,'comp_vd_3.dat'),[resx resy]); %Average velocity
             
             % Initialize data time-resolved data arrays
-            v = zeros(resx,resy,nframes); %Time-resolved velocity 
             mag = zeros(resx,resy,nframes); %Time-resolved magnitude
             cd = zeros(resx,resy,nframes); %Time-resolved complex difference
+            v = zeros(resx,resy,nframes); %Time-resolved velocity 
             for j = 1:nframes  %velocity is placed in v3 for 2D (through-plane)
-                v(:,:,j) = load_dat(fullfile(pcDir,['\ph_' num2str(j-1,'%03i') '_vd_3.dat']),[resx resy]);
                 mag(:,:,j) = load_dat(fullfile(pcDir,['\ph_' num2str(j-1,'%03i') '_mag.dat']),[resx resy]);
                 cd(:,:,j) = load_dat(fullfile(pcDir,['\ph_' num2str(j-1,'%03i') '_cd.dat']),[resx resy]);
+                v(:,:,j) = load_dat(fullfile(pcDir,['\ph_' num2str(j-1,'%03i') '_vd_3.dat']),[resx resy]);
             end 
-            data.cd = cd;
             data.mag = mag;
+            data.cd = cd;
             data.v = v;
         end
         set(handles.MessageBar,'String', ...
             ['"' name '" has been loaded successfully. Add another dataset OR select "Loading Complete" if finished loading data']);
         handles.pcDatasets(pcDataIter).Names = name; %add to name to namelist in handles
         handles.pcDatasets(pcDataIter).Data = data; %add data to handles
+        handles.pcDatasets(pcDataIter).RootDir = pcDir;
         handles.global.pcDataIter = pcDataIter + 1; %move up index for next dataset
         set(handles.DataName2DPC,'String','');
         set(handles.Listbox2DPC,'String',{handles.pcDatasets.Names}); %update listbox names
@@ -302,12 +307,11 @@ function Listbox2DPC_CreateFcn(hObject, eventdata, handles)
 % --- REMOVE 2DPC CALLBACK
 function Remove2DPC_Callback(hObject, eventdata, handles)
     index = get(handles.Listbox2DPC, 'value'); %get current index to remove
-    handles.global.pcDatasets(index) = []; %remove everything at index
+    handles.pcDatasets(index) = []; %remove everything at index
     set(handles.Listbox2DPC,'Value',1);
-    set(handles.Listbox2DPC,'String',{handles.global.pcDatasets.Names}); %reset listbox
+    set(handles.Listbox2DPC,'String',{handles.pcDatasets.Names}); %reset listbox
     handles.global.pcDataIter = handles.global.pcDataIter - 1; %bring index back 1
     
-    clear index
     guidata(hObject, handles);
         
 % --- REMOVE 2DPC CREATE FUNCTION
@@ -363,13 +367,13 @@ function ButtonLoad2DMAG_Callback(hObject, eventdata, handles)
                 ['"' name '" has been loaded successfully. Add another dataset OR select "Loading Complete" if finished loading data']);
             handles.magDatasets(magDataIter).Names = name;
             handles.magDatasets(magDataIter).Data = data;
+            handles.magDatasets(magDataIter).RootDir = magDir;
             handles.global.magDataIter = magDataIter + 1;
             set(handles.DataName2DMAG,'String','')
             set(handles.Listbox2DMAG,'String',{handles.magDatasets.Names});
         end 
     end 
     
-    clear name data temp dirInfo extension magFile magDir i
     guidata(hObject, handles);
 
 % --- BUTTON LOAD 2DMAG CREATE FUNCTION
@@ -394,7 +398,6 @@ function Remove2DMAG_Callback(hObject, eventdata, handles)
     set(handles.Listbox2DMAG,'String',{handles.global.magDatasets.Names});
     handles.global.magDataIter = handles.global.magDataIter - 1;
     
-    clear index 
     guidata(hObject, handles);
 
 % --- REMOVE 2DMAG CREATE FUNCTION
@@ -426,7 +429,7 @@ function SaveCaseButton_Callback(hObject, eventdata, handles)
     else
         set(handles.MessageBar,'String', ...
             'Select the directory where you will save the Case File.');
-        casefileDir = uigetdir('C:\','Select the directory where you will save the Case File.'); %get save directory
+        casefileDir = uigetdir(pwd,'Select the directory where you will save the Case File.'); %get save directory
         casename = get(handles.CaseName,'String'); %pull name from textfield
         date = datestr(now); %get current date/time
         chopDate = [date(1:2) '-' date(4:6) '-' date(10:11) '-' date(13:14) date(16:17)]; %chop date up
@@ -435,7 +438,7 @@ function SaveCaseButton_Callback(hObject, eventdata, handles)
         filenameWithPath = [casefileDir '\' filename];
         save(filenameWithPath,'anatDatasets','pcDatasets','magDatasets'); %save anat, pc, and mag datasets
         set(handles.MessageBar,'String','Data saved successfully');
-        set(handles.CaseName,'');
+        set(handles.CaseName,'String','');
     end 
     
     guidata(hObject, handles);
@@ -460,7 +463,7 @@ function ButtonCompleteLoading_Callback(hObject, eventdata, handles)
         set(handles.MessageBar,'String', ...
             '2D PC datasets required to complete loading process.'); %don't move on
     else
-        set(handles.MessageBar,'String','Loading Process Complete...');
+        set(handles.MessageBar,'String','Loading Process Complete!');
         AnalyzePWV(handles.anatDatasets,handles.pcDatasets,handles.magDatasets) %MOVE TO NEXT GUI
     end 
 
