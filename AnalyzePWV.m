@@ -397,6 +397,9 @@ function loadROIbutton_Callback(hObject, eventdata, handles)
         end 
         
         dataDir = handles.pcDatasets(planeNum).RootDir; %directory in which plane data is located
+        if dataDir(end)=='\' %kill the slash if it exists
+            dataDir(end) = [];
+        end 
         if ~exist([dataDir '\ROIimages'],'dir') %if the proposed directory doesn't exist
             mkdir([dataDir '\ROIimages']); %make it
             cd([dataDir '\ROIimages']); %move into it
@@ -447,6 +450,8 @@ function completeLoadingROI_Callback(hObject, eventdata, handles)
         set(handles.drawCenterlineButton,'Enable','on'); %allow centerline drawing and loading
         set(handles.loadCenterline,'Enable','on'); 
         set(handles.showPCPlanesRadio,'Enable','on'); %turn on displaying of 2D slices on anatomical images
+        set(handles.range1Edit,'Enable','on');
+        set(handles.range2Edit,'Enable','on');
 
         for i = 1:numel(handles.anatDatasets) %for each anatomical dataset
             images = handles.anatDatasets(i).Data; %grab images from handle
@@ -702,6 +707,8 @@ function drawCenterlineButton_Callback(hObject, eventdata, handles)
         set(handles.anatListbox,'Enable','off');
         set(handles.anatZoomButton,'Enable','off');
         set(handles.anatUnzoomButton,'Enable','off');   
+        set(handles.range1Edit,'Enable','on');
+        set(handles.range2Edit,'Enable','on');
 
         range1 = str2double(get(handles.range1Edit,'String')); %get first slice for centerline tracing
         range2 = str2double(get(handles.range2Edit,'String')); %last slice for centerline tracing

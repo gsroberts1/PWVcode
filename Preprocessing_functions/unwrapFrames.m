@@ -1,6 +1,6 @@
 clean;
 load2DPC;
-frame = 15;
+frame = 18;
 plane = v(:,:,3,frame);
 
 figure; imshow(MAG,[]);
@@ -28,6 +28,7 @@ plane = plane.*(~roiMask);
 plane = plane + UW;
 
 figure; imshow(plane,[]);
-fid = fopen('ph_014_vd_3.dat','w');
+filename = ['ph_' num2str(frame-1,'%03.f') '_vd_3.dat'];
+fid = fopen(filename,'w');
 fwrite(fid,plane,'int16');
 fclose(fid);
