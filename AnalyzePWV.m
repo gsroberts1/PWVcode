@@ -83,7 +83,7 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     handles.global.spanUDAnat = [0,0];
     handles.global.spanLRAnat = [0,0];
     
-    handles.global.interpType = 'None'; %interpolation type (i.e. Gaussian)
+    handles.global.interpType = 'Gaussian'; %interpolation type (i.e. Gaussian)
     handles.global.pgShift = 0; %flag for shifting flow curve
     handles.global.showErrorBars = 0; %flag for showing error bars
     handles.global.startAnalyzing = 0; %flag to begin PWV calculations
@@ -95,7 +95,7 @@ function AnalyzePWV_OpeningFcn(hObject, eventdata, handles, varargin)
     end 
     set(handles.pcPlanePopup,'String',{handles.pcDatasets.Names}); %list of all planes (AAo, AbdAo, etc.)
     set(handles.pcDatasetPopup,'String',fieldnames(handles.pcDatasets(1).Data)); %list of all datasets (CD, MAG, v, etc.)
-    set(handles.interpolatePopup,'String',{'None','Gaussian','Spline'}); %set all possible interpolation types
+    set(handles.interpolatePopup,'String',{'Gaussian','Spline','None'}); %set all possible interpolation types
     set(handles.anatListbox,'String',{handles.anatDatasets.Names}); %list of all anatomical datasets (Axial, Coronal, etc.)
     set(handles.interpolatePopup,'Enable','off'); %initialize radios and buttons
     set(handles.showPCPlanesRadio,'Enable','off'); 
@@ -535,11 +535,11 @@ function interpolatePopup_Callback(hObject, eventdata, handles)
     interp = get(handles.interpolatePopup,'Value');
     switch interp
         case 1
-            handles.global.interpType = 'None'; %set global flag
+            handles.global.interpType = 'Gaussian'; %set global flag
         case 2
-            handles.global.interpType = 'Gaussian';
-        case 3
             handles.global.interpType = 'Spline';
+        case 3
+            handles.global.interpType = 'None';
         otherwise
     end 
  
@@ -1181,7 +1181,7 @@ function resetButton_Callback(hObject, eventdata, handles)
         set(handles.loadROIbutton,'Enable','on');
         set(handles.pcPlanePopup,'String',{handles.pcDatasets.Names}); %reset listbox strings (just to be safe)
         set(handles.pcDatasetPopup,'String',fieldnames(handles.pcDatasets(1).Data));
-        set(handles.interpolatePopup,'String',{'None','Gaussian','Spline'});
+        set(handles.interpolatePopup,'String',{'Gaussian','Spline','None'});
         set(handles.anatListbox,'String',{handles.anatDatasets.Names});
         set(handles.interpolatePopup,'Enable','off');
         if numel(handles.magDatasets)==0
