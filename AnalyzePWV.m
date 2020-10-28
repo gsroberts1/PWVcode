@@ -425,7 +425,7 @@ function loadROIbutton_Callback(hObject, eventdata, handles)
             else
                 for j=1:length(handles.pcDatasets(i).ROIdata)
                     name = handles.pcDatasets(i).Names; %get plane name
-                    planeName = [name ' Plane ' num2str(j)]; %needed if more than one ROI/plane
+                    planeName = [name ' ROI ' num2str(j)]; %needed if more than one ROI/plane
                     handles.pcDatasets(i).ROIdata(j).Name = planeName; %name ROI
                 end 
             end 
@@ -1073,27 +1073,27 @@ function computePWVButton_Callback(hObject, eventdata, handles)
     end 
     
     if numel(distance)==1 %if 2 ROIs, we have 1 distance
-        set(handles.distanceHeader1,'String',' Plane 1 --> 2'); %set 1st text field
+        set(handles.distanceHeader1,'String',' ROI 1 --> 2'); %set 1st text field
         set(handles.distance1,'String',[num2str(round(distance(1),1)) ' mm']); %write out distance b/w ROIs
     elseif numel(distance)==3 %if 3 ROIs, we have 3 distances
-        set(handles.distanceHeader1,'String',' Plane 1 --> 2');
+        set(handles.distanceHeader1,'String',' ROI 1 --> 2');
         set(handles.distance1,'String',[num2str(round(distance(1),1)) ' mm']); 
-        set(handles.distanceHeader2,'String',' Plane 1 --> 3');
+        set(handles.distanceHeader2,'String',' ROI 1 --> 3');
         set(handles.distance2,'String',[num2str(round(distance(2),1)) ' mm']); 
-        set(handles.distanceHeader3,'String',' Plane 2 --> 3');
+        set(handles.distanceHeader3,'String',' ROI 2 --> 3');
         set(handles.distance3,'String',[num2str(round(distance(3),1)) ' mm']);       
     else %if 4 ROIs, we have 6 distances
-        set(handles.distanceHeader1,'String',' Plane 1 --> 2');
+        set(handles.distanceHeader1,'String',' ROI 1 --> 2');
         set(handles.distance1,'String',[num2str(round(distance(1),1)) ' mm']); 
-        set(handles.distanceHeader2,'String',' Plane 1 --> 3');
+        set(handles.distanceHeader2,'String',' ROI 1 --> 3');
         set(handles.distance2,'String',[num2str(round(distance(2),1)) ' mm']); 
-        set(handles.distanceHeader3,'String',' Plane 1 --> 4');
+        set(handles.distanceHeader3,'String',' ROI 1 --> 4');
         set(handles.distance3,'String',[num2str(round(distance(3),1)) ' mm']); 
-        set(handles.distanceHeader4,'String',' Plane 2 --> 3');
+        set(handles.distanceHeader4,'String',' ROI 2 --> 3');
         set(handles.distance4,'String',[num2str(round(distance(4),1)) ' mm']);
-        set(handles.distanceHeader5,'String',' Plane 2 --> 4');
+        set(handles.distanceHeader5,'String',' ROI 2 --> 4');
         set(handles.distance5,'String',[num2str(round(distance(5),1)) ' mm']); 
-        set(handles.distanceHeader6,'String',' Plane 3 --> 4');
+        set(handles.distanceHeader6,'String',' ROI 3 --> 4');
         set(handles.distance6,'String',[num2str(round(distance(6),1)) ' mm']);         
     end 
     

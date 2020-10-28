@@ -261,9 +261,9 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
             resx = pcviprHeader.matrixx; %resolution in x
             resy = pcviprHeader.matrixy; %resolution in y
             nframes = pcviprHeader.frames; %number of cardiac frames
-            data.MAG = load_dat(fullfile(pcDir,'MAG.dat'),[resx resy]); %Average magnitude
-            data.CD = load_dat(fullfile(pcDir,'CD.dat'),[resx resy]); %Average complex difference
-            data.VMEAN = load_dat(fullfile(pcDir,'comp_vd_3.dat'),[resx resy]); %Average velocity
+            MAG = load_dat(fullfile(pcDir,'MAG.dat'),[resx resy]); %Average magnitude
+            CD = load_dat(fullfile(pcDir,'CD.dat'),[resx resy]); %Average complex difference
+            VMEAN = load_dat(fullfile(pcDir,'comp_vd_3.dat'),[resx resy]); %Average velocity
             
             % Initialize data time-resolved data arrays
             mag = zeros(resx,resy,nframes); %Time-resolved magnitude
@@ -273,10 +273,13 @@ function ButtonLoad2DPC_Callback(hObject, eventdata, handles)
                 mag(:,:,j) = load_dat(fullfile(pcDir,['\ph_' num2str(j-1,'%03i') '_mag.dat']),[resx resy]);
                 cd(:,:,j) = load_dat(fullfile(pcDir,['\ph_' num2str(j-1,'%03i') '_cd.dat']),[resx resy]);
                 v(:,:,j) = load_dat(fullfile(pcDir,['\ph_' num2str(j-1,'%03i') '_vd_3.dat']),[resx resy]);
-            end 
-            data.mag = mag;
-            data.cd = cd;
-            data.v = v;
+            end
+            data.MAG = flipud(MAG);
+            data.CD = flipud(CD);
+            data.VMEAN = flipud(VMEAN);
+            data.mag = flipud(mag);
+            data.cd = flipud(cd);
+            data.v = flipud(v);
         end
         set(handles.MessageBar,'String', ...
             ['"' name '" has been loaded successfully. Add another dataset OR select "Loading Complete" if finished loading data']);

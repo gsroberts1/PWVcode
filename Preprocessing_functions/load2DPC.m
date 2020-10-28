@@ -1,4 +1,3 @@
-tic
 directory = pwd;
 fid = fopen([directory '\pcvipr_header.txt'], 'r');
 dataArray = textscan(fid, '%s%s%[^\n\r]', 'Delimiter', ' ', 'MultipleDelimsAsOne', true, 'ReturnOnError', false);
@@ -29,8 +28,18 @@ for j = 1:nframes
 end
 vz = squeeze(v(:,:,3,:));
 
-toc
+MAG = flipud(MAG);
+CD = flipud(CD);
+VMEAN = flipud(VMEAN);
+v = flipud(v);
+vz = flipud(vz);
+mag = flipud(mag);
+cd = flipud(cd);
 
+spatialRes = nonzeros(abs(([pcviprHeader.ix pcviprHeader.iy pcviprHeader.iz])));
+temporalRes = pcviprHeader.timeres;
+disp(['Spatial Resolution = ' num2str(spatialRes) ' mm']);
+disp(['Temporal Resolution = ' num2str(temporalRes) ' ms']);
 
 function v = load_dat(name, res)
 %% Load Dat
