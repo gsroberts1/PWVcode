@@ -1,0 +1,72 @@
+#!/bin/bash
+
+## Write recon_parameters.txt file
+function write_recon_parameters () {
+    echo "Reconstruction Parameters" >> recon_parameters.txt
+    echo " " >> recon_parameters.txt
+    local username=$USER
+    echo "Username: $username  " >> recon_parameters.txt
+    echo " " >> recon_parameters.txt
+    now="`date +%Y%m%d%H%M`"
+    echo "Time of Recon (YY-MM-DD_HH-MM): $now  " >> recon_parameters.txt
+    echo " "  >> recon_parameters.txt
+    match="-"
+    repl="\n-"
+    printf "Recon Parameters:\n${RECON//$match/$repl}\n" >> recon_parameters.txt
+    echo " "  >> recon_parameters.txt
+    echo "Recon Notes:"  >> recon_parameters.txt
+    echo "$NOTE" >> recon_parameters.txt
+}
+
+## File Organizer
+function pack_files () {
+    write_recon_parameters
+
+    username=$USER
+    now="`date +%Y%m%d%H%M`"
+    local RECON_DIR="RECON_${now}_${username}"
+    if [ ! -d "${RECON_DIR}" ]; then
+        mkdir $RECON_DIR
+    mkdir "${RECON_DIR}/dat" "${RECON_DIR}/DICOM"
+    if ls *.dcm >/dev/null 2>&1; then    mv  *.dcm "${RECON_DIR}/DICOM";    fi
+    if ls *.dat >/dev/null 2>&1; then    mv *.dat "${RECON_DIR}/dat";    fi
+    if [ -f pcvipr_header.txt ]; then    mv pcvipr_header.txt "${RECON_DIR}/dat";    fi
+    if [ -f data_header.txt ]; then    mv data_header.txt "${RECON_DIR}/dat";    fi
+    if [ -f Time.txt ]; then    mv Time.txt "${RECON_DIR}/dat";    fi
+    if [ -f Resp.txt ]; then    mv Resp.txt "${RECON_DIR}/dat";    fi
+    if [ -f TimeResp.txt ]; then    mv TimeResp.txt "${RECON_DIR}/dat";    fi
+    if [ -f Sorted.txt ]; then    mv Sorted.txt "${RECON_DIR}/dat";    fi
+    if [ -f TimeWeight.txt ]; then    mv TimeWeight.txt "${RECON_DIR}/dat";    fi
+    if [ -f Weight.txt ]; then    mv Weight.txt "${RECON_DIR}/dat";    fi
+    if [ -f recon.log ]; then    mv recon.log "${RECON_DIR}/dat";    fi
+    if [ -f recon_parameters.txt ]; then    mv recon_parameters.txt "${RECON_DIR}/dat";    fi
+    if [ -f scan_info.txt ]; then    mv scan_info.txt "${RECON_DIR}/dat";    fi
+    if [ -f pfile.xsd ]; then    mv pfile.xsd "${RECON_DIR}/dat";    fi
+    if [ -f Raw.h5 ]; then    mv Raw.h5 "${RECON_DIR}/dat";    fi
+    if [ -f *.header.xml ]; then    mv *.header.xml "${RECON_DIR}/dat";    fi
+    if [ -f *.raw_header.bin ]; then    mv *.raw_header.bin "${RECON_DIR}/dat";    fi
+    if [ -f gating_histo.txt ]; then    mv gating_histo.txt "${RECON_DIR}/dat";    fi
+    if [ -f Gmean.h5 ]; then    mv Gmean.h5 "${RECON_DIR}/dat";    fi
+    if [ -f Gradient_Pulse_Info.h5 ]; then    mv Gradient_Pulse_Info.h5 "${RECON_DIR}/dat";    fi
+    fi
+}
+
+## Get ScanArchive and recon flags
+SCANARCHIVE=$1
+RECON_FLAGS="-dat_plus_dicom -pils -walsh -gating_type retro_ecg -gate_delay 22 -rcframes 40 -zoom_x 0.8906 -zoom_y 0.8906 -rcxres 256 -rcyres 256 -resp_gate thresh -resp_gate_efficiency 0.5 -correct_resp_drift"
+# Note that the above zooms and reconstructed resolutions were calculated to match Cartesian PC resolutions.
+
+
+RECON_ARGS="pcvipr_recon_binary -f $SCANARCHIVE $RECON_FLAGS"
+
+## Write Recon output
+echo $RECON_ARGS | tee recon.log
+$RECON_ARGS | tee -a recon.log
+
+## Organize dats and dicoms
+cat ph*3.dat > vzStack.dat
+cat ph*cd.dat > cdStack.dat
+cat ph*mag.dat > magStack.dat
+pack_files
+
+
