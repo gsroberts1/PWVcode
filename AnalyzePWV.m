@@ -452,6 +452,9 @@ function completeLoadingROI_Callback(hObject, eventdata, handles)
         set(handles.showPCPlanesRadio,'Enable','on'); %turn on displaying of 2D slices on anatomical images
         set(handles.range1Edit,'Enable','on');
         set(handles.range2Edit,'Enable','on');
+        set(handles.anatListbox,'Enable','on');
+        set(handles.anatZoomButton,'Enable','on');
+        set(handles.anatUnzoomButton,'Enable','on');   
 
         for i = 1:numel(handles.anatDatasets) %for each anatomical dataset
             images = handles.anatDatasets(i).Data; %grab images from handle
@@ -629,8 +632,8 @@ function anatZoomButton_Callback(hObject, eventdata, handles)
     spanUDAnat = handles.global.spanUDAnat; %get current span of rows
     spanLRAnat = handles.global.spanLRAnat; %get current span of columns
     % Update row span with rectangle vertices (note that we can only zoom in (hence the plus)
-    spanUDAnat = spanUDAnat(1)+positions(2):(spanUDAnat(1)+positions(2)+positions(4));
-    spanLRAnat = spanLRAnat(1)+positions(1):(spanLRAnat(1)+positions(1)+positions(3));
+    handles.global.spanUDAnat = spanUDAnat(1)+positions(2):(spanUDAnat(1)+positions(2)+positions(4));
+    handles.global.spanLRAnat = spanLRAnat(1)+positions(1):(spanLRAnat(1)+positions(1)+positions(3));
     handles.global.zoomedAnat = 1; %set flag to zoomed
 
     guidata(hObject, handles);
@@ -723,13 +726,33 @@ function drawCenterlineButton_Callback(hObject, eventdata, handles)
         for i = 1:size(images,3) %go slice-by-slice through each image
             set(handles.sliceNumText,'String',num2str(currSlice)); %show number of current slice
             image = images(:,:,i); %get slice
+            if handles.global.zoomedAnat %if we are zoomed in 
+               image = image(handles.global.spanUDAnat,handles.global.spanLRAnat); %make it so we span the desired width
+            end
             imshow(image,[]); %show single image
+            
             for j = 1:numel(handles.anatDatasets(datasetNum).planeLineRows) %plot PC lines
                 pcRow = handles.anatDatasets(datasetNum).planeLineRows(j);
-                image(pcRow,:) = max(max(image))+100;
-                hold on; plot(1:size(image,1),pcRow.*ones(1,size(image,2)),'y');
+                if handles.global.zoomedAnat
+                    topRow = min(handles.global.spanUDAnat);
+                    bottomRow = max(handles.global.spanUDAnat);
+                    leftColumn = min(handles.global.spanLRAnat);
+                    rightColumn = max(handles.global.spanLRAnat);
+                    if (pcRow > topRow) && (pcRow < bottomRow)
+                        pcRow = pcRow - topRow; %shift our row to our current coordinates
+                        %image(pcRow,:) = max(max(image))+100;
+                        hold on; plot(1:size(image,1),pcRow.*ones(1,size(image,1)),'y'); %plot as yellow line at height of 2D plane
+                    end 
+                else
+                    hold on; plot(1:size(image,1),pcRow.*ones(1,size(image,1)),'y'); %plot as yellow line at height of 2D plane
+                end 
+                
             end 
             [xTemp,yTemp] = getpts(); %draw points on image along aorta
+            if handles.global.zoomedAnat
+                xTemp = xTemp + leftColumn;
+                yTemp = yTemp + topRow;
+            end 
             zTemp = i.*(ones(size(xTemp,1),1)); %add z-coordinates for slice
             x = [x; xTemp]; %append points
             y = [y; yTemp];
@@ -1170,7 +1193,7 @@ function resetButton_Callback(hObject, eventdata, handles)
         handles.global.spanLR = [0,0];
         handles.global.spanUDAnat = [0,0];
         handles.global.spanLRAnat = [0,0];
-        handles.global.interpType = 'None';
+        handles.global.interpType = 'Gaussian';
         handles.global.showErrorBars = 0;
         handles.global.startAnalyzing = 0;
         handles.global.pgShift = 0;
@@ -1223,7 +1246,7 @@ function TimeVsDistance_CreateFcn(hObject, eventdata, handles)
 % --- EXPORT ANALYSIS - CALLBACK
 function exportAnalysisButton_Callback(hObject, eventdata, handles)
     set(handles.messageBar,'String','Exporting data...');
-    interpTypes = {'None','Gaussian','Spline'};
+    interpTypes = {'Gaussian','Spline','None'};
     for t=1:length(interpTypes) %export data for each interp type
         handles.global.interpType = interpTypes{t}; %switch interp type
         flow = computeTTs(handles.flow,handles.global); %recalculate flow struct for each interp
@@ -1558,11 +1581,22 @@ function updateAnatImages(handles)
         imshow(anatSlice,[]); %show image
         for i=1:numel(handles.anatDatasets(datasetNum).planeLineRows) %for each 2D plane 
             pcRow = handles.anatDatasets(datasetNum).planeLineRows(i); %get the row of the plane
-            anatSlice(pcRow,:) = max(max(anatSlice))+100; %arbitrarily assign line to high image value
-            hold on; plot(1:size(anatSlice,1),pcRow.*ones(1,size(anatSlice,2)),'y'); %plot as full width yellow line at height of 2D plane
+            %anatSlice(pcRow,:) = max(max(anatSlice))+100; %arbitrarily assign line to high image value
+            topRow = min(handles.global.spanUDAnat);
+            bottomRow = max(handles.global.spanUDAnat);
+            
+            if (pcRow > bottomRow) && (pcRow < topRow) && handles.global.zoomedAnat
+                pcRow = pcRow - topRow; %shift our row to our current coordinates
+                hold on; plot(1:size(anatSlice,1),pcRow.*ones(1,size(anatSlice,1)),'y'); %plot as yellow line at height of 2D plane
+            end 
+            if ~handles.global.zoomedAnat
+               hold on; plot(1:size(anatSlice,1),pcRow.*ones(1,size(anatSlice,1)),'y'); %plot as yellow line at height of 2D plane
+            end
+            
         end 
-    else 
-       imshow(anatSlice,[]); %else we just show the plain ol image
+    else
+        %cla(handles.anatPlanePlot,'reset') %otherwise, reset the plot
+        imshow(anatSlice,[]); %else we just show the plain ol image
     end 
     set(handles.sliceNumText,'String',sliceNum); %show our current slice number
 
