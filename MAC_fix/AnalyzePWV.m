@@ -148,7 +148,7 @@ function pcRadio_Callback(hObject, eventdata, handles)
 % --- MAG RADIO - CALLBACK
 function magRadio_Callback(hObject, eventdata, handles)
     set(handles.pcPlanePopup,'String',{handles.magDatasets.Names}); %list names of all bSSFP slices (AAo,AbdAo)
-    set(handles.pcDatasetPopup,'Enable','off'); %no need for dataset popup (we only have mangitude bSSFP data\
+    set(handles.pcDatasetPopup,'Enable','off'); %no need for dataset popup (we only have mangitude bSSFP data)
     set(handles.pcDatasetPopup,'String',' '); %remove any text
     set(handles.pcRadio,'Value',0); %turn off pc radio (only one should be selected at once)
     updatePCImages(handles); %update images on PC plot 
@@ -396,44 +396,18 @@ function loadROIbutton_Callback(hObject, eventdata, handles)
             handles.pcDatasets(planeNum).ROIdataSpline = roiStatisticsSpline;
         end 
         
-        dims(1) = size(handles.pcDatasets(planeNum).Data.MAG,1); %get dimensions
-        dims(2) = size(handles.pcDatasets(planeNum).Data.MAG,1);
-
-        originShift = [handles.pcDatasets(planeNum).Info.ImagePositionPatient;1]; % origin is top left corner of image
-        xres = handles.pcDatasets(planeNum).Info.PixelSpacing(1);
-        yres = handles.pcDatasets(planeNum).Info.PixelSpacing(2);
-        zres = handles.pcDatasets(planeNum).Info.SliceThickness;
-
-        % sometimes get very small values that should be 0 (so I round)
-        xVector = round( handles.pcDatasets(planeNum).Info.ImageOrientationPatient(1:3) ,8); % what direction rows run w/r/to x
-        yVector = round( handles.pcDatasets(planeNum).Info.ImageOrientationPatient(4:6) ,8); % what direction the cols run w/r/to y
-        zVector = [cross(xVector,yVector);0]; %take cross product to get zVector
-        xVector = [xVector;0]; %add a dummy zero to the end
-        yVector = [yVector;0]; 
-        pcTransform = [xres*xVector yres*yVector zres*zVector originShift]; %create rotation matrix
-        for i=1:dims(1)
-            for j=1:dims(2)
-                tPoint = pcTransform*[i;j;1;1];
-                tPoint(4) = [];
-                pcGrid(i,j,:) = tPoint;
-            end 
-        end 
-        handles.pcDatasets(planeNum).pcTransform = pcTransform;
-        handles.pcDatasets(planeNum).pcGrid = pcGrid;
-        
-        
         dataDir = handles.pcDatasets(planeNum).RootDir; %directory in which plane data is located
-        if dataDir(end)=='\' %kill the slash if it exists
+        if dataDir(end)=='/' %kill the slash if it exists
             dataDir(end) = [];
         end 
-        if ~exist([dataDir '\ROIimages'],'dir') %if the proposed directory doesn't exist
-            mkdir([dataDir '\ROIimages']); %make it
-            cd([dataDir '\ROIimages']); %move into it
+        if ~exist([dataDir '/ROIimages'],'dir') %if the proposed directory doesn't exist
+            mkdir([dataDir '/ROIimages']); %make it
+            cd([dataDir '/ROIimages']); %move into it
             frame = getframe(handles.pcPlanePlot); %get a snapshot of the PC plane plot with ROI
             image = frame2im(frame); %make into image
             imwrite(image,[handles.pcDatasets(planeNum).Names '.png']) %write it out as PNG
         else
-            cd([dataDir '\ROIimages']); %if ROIimages already exists, move into it
+            cd([dataDir '/ROIimages']); %if ROIimages already exists, move into it
             frame = getframe(handles.pcPlanePlot);
             image = frame2im(frame);
             imwrite(image,[handles.pcDatasets(planeNum).Names '.png'])
@@ -500,25 +474,15 @@ function completeLoadingROI_Callback(hObject, eventdata, handles)
             zVector = [cross(xVector,yVector);0]; %take cross product to get zVector
             xVector = [xVector;0]; %add a dummy zero to the end
             yVector = [yVector;0]; 
-            anatTransform = [xres*xVector yres*yVector zres*zVector originShift]; %create rotation matrix
-            sliceNum = 4;
-            for j=1:dims(1)
-                for k=1:dims(2)
-                    tPoint = anatTransform*[j;k;sliceNum;1];
-                    tPoint(4) = [];
-                    anatGrid(j,k,:) = tPoint;
-                end 
-            end 
-            handles.anatDatasets(i).anatTransform = anatTransform;
-            handles.anatDatasets(i).anatGrid = anatGrid;
-            sliceDim = find(anatTransform(:,3)); %find our slice dimension (eg 2=Y,3=Z)
-            colsRunningDir = sign(nonzeros(anatTransform(:,3))); %check if cols are running forward (+) or backwards (-)
-            handles.anatDatasets(i).rotationMatrix = anatTransform;      
+            rotationMatrix = [xres*xVector yres*yVector zres*zVector originShift]; %create rotation matrix
+            sliceDim = find(rotationMatrix(:,3)); %find our slice dimension (eg 2=Y,3=Z)
+            colsRunningDir = sign(nonzeros(rotationMatrix(:,3))); %check if cols are running forward (+) or backwards (-)
+            handles.anatDatasets(i).rotationMatrix = rotationMatrix;      
             handles.anatDatasets(i).sliceDim = sliceDim;
 
-            topFrontLeft = anatTransform*[1;1;1;1]; %topfrontleft coords
+            topFrontLeft = rotationMatrix*[1;1;1;1]; %topfrontleft coords
             topFrontLeft(4) = []; % remove dummy dimension
-            backBottomRight = anatTransform*[dims(1);dims(2);dims(3);1];
+            backBottomRight = rotationMatrix*[dims(1);dims(2);dims(3);1];
             backBottomRight(4) = [];
             spanZ(1) = topFrontLeft(3); %first Z point (mm)
             spanZ(2) = backBottomRight(3); %last Z point (mm)
@@ -542,16 +506,16 @@ function completeLoadingROI_Callback(hObject, eventdata, handles)
             handles.anatDatasets(i).planeLineRows = planeLineRows; %save into handles
         end   
 
-        dirSplits = regexp(handles.pcDatasets(1).RootDir,'\','split'); %break up directory in which plane data is located
+        dirSplits = regexp(handles.pcDatasets(1).RootDir,'/','split'); %break up directory in which plane data is located
         dirSplits(end) = []; %chop off last folder
-        baseDir = strjoin(dirSplits,'\'); %rejoin string to get name of folder one up from plane data
-        if ~exist([baseDir '\FlowWaveformImages'],'dir') %if directory doesn't exist
-            mkdir([baseDir '\FlowWaveformImages']); %make it
-            cd([baseDir '\FlowWaveformImages']); %go to it
+        baseDir = strjoin(dirSplits,'/'); %rejoin string to get name of folder one up from plane data
+        if ~exist([baseDir '/FlowWaveformImages'],'dir') %if directory doesn't exist
+            mkdir([baseDir '/FlowWaveformImages']); %make it
+            cd([baseDir '/FlowWaveformImages']); %go to it
             frame = getframe(handles.velocityPlot); %get snapshot of velocity plot
             imwrite(frame2im(frame),'FlowWaveform.png') %write out to PNG
         else %or if the directory already exists
-            cd([baseDir '\FlowWaveformImages']); %go to it
+            cd([baseDir '/FlowWaveformImages']); %go to it
             frame = getframe(handles.velocityPlot);
             imwrite(frame2im(frame),'FlowWaveform.png')
         end 
@@ -692,7 +656,7 @@ function loadCenterline_Callback(hObject, eventdata, handles)
     [anatCLdataset, CenterlineData] = uigetfile({'*.mat;','Useable Files (*.mat)';
        '*.mat','MAT-files (*.mat)'; ...
        '*.*',  'All Files (*.*)'}, 'Select the case file (NAME_pwvcasefile_DATE.mat)');
-    load([CenterlineData '\' anatCLdataset]); %load CL data
+    load([CenterlineData '/' anatCLdataset]); %load CL data
     
     % If we find a dataset in which anatCLdataset.RootDir matches
     % handles.anatDatasets.RootDir, we'll put the CL/distance info there.
@@ -841,12 +805,12 @@ function drawCenterlineButton_Callback(hObject, eventdata, handles)
         handles.anatDatasets(datasetNum).Distances = distances; %save centerline info to handles
         handles.anatDatasets(datasetNum).Centerline = splineLine;
         
-        dirSplits = regexp(handles.anatDatasets(datasetNum).RootDir,'\','split'); %get root directory of anatomical dicoms
+        dirSplits = regexp(handles.anatDatasets(datasetNum).RootDir,'/','split'); %get root directory of anatomical dicoms
         dirSplits(end) = []; dirSplits(end) = []; %pull back one directory (adds an extra blank directory at end of dirSplits)
-        baseDir = strjoin(dirSplits,'\'); %rejoin cell, this should be directory of all dicom images
-        if ~exist([baseDir '\CenterlineData'],'dir') %if we haven't made this directory yet
-            mkdir([baseDir '\CenterlineData']); %make it
-            cd([baseDir '\CenterlineData']); %move to it
+        baseDir = strjoin(dirSplits,'/'); %rejoin cell, this should be directory of all dicom images
+        if ~exist([baseDir '/CenterlineData'],'dir') %if we haven't made this directory yet
+            mkdir([baseDir '/CenterlineData']); %make it
+            cd([baseDir '/CenterlineData']); %move to it
             frame = getframe(handles.anatPlanePlot); %get the anatomical image in the main GUI
             imwrite(frame2im(frame),'anatomicalSlice.png') %write to PNG
             savefig(fig3,'Centerline3D'); %save our 3D Matlab figure
@@ -857,7 +821,7 @@ function drawCenterlineButton_Callback(hObject, eventdata, handles)
             anatCLdataset.Data = [];
             save anatCLdataset.mat anatCLdataset
         else %or just move to the directory if we've made it already
-            cd([baseDir '\CenterlineData']);
+            cd([baseDir '/CenterlineData']);
             frame = getframe(handles.anatPlanePlot);
             imwrite(frame2im(frame),'anatomicalSlice.png')
             savefig(fig3,'Centerline3D');
@@ -886,10 +850,10 @@ function deleteCenterlineButton_Callback(hObject, eventdata, handles)
             handles.anatDatasets(i).Distances = []; %remove CL distances
             handles.anatDatasets(i).Centerline = []; %remove CL points
             
-            dirSplits = regexp(handles.anatDatasets(i).RootDir,'\','split'); %get root directory of anatomical dicoms
+            dirSplits = regexp(handles.anatDatasets(i).RootDir,'/','split'); %get root directory of anatomical dicoms
             dirSplits(end) = []; dirSplits(end) = []; %pull back one directory (adds an extra blank directory at end of dirSplits)
-            baseDir = strjoin(dirSplits,'\'); %rejoin cell, this should be directory of all dicom images
-            cd([baseDir '\CenterlineData']); %move to it
+            baseDir = strjoin(dirSplits,'/'); %rejoin cell, this should be directory of all dicom images
+            cd([baseDir '/CenterlineData']); %move to it
             delete anatCLdataset.mat
         end
     end
@@ -1405,20 +1369,20 @@ function exportAnalysisButton_Callback(hObject, eventdata, handles)
         
         % Make table for writing excel file
         pwvTable = table(PLANES,Distances,TTPoint,TTFoot,TTUpstroke,Xcorr,PWV_Point,PWV_Foot,PWV_Upstroke,PWV_Xcorr,PWV_Average);
-        dirSplits = regexp(handles.pcDatasets(1).RootDir,'\','split'); %break up directory in which plane data is located
+        dirSplits = regexp(handles.pcDatasets(1).RootDir,'/','split'); %break up directory in which plane data is located
         dirSplits(end) = []; %chop off last folder
-        baseDir = strjoin(dirSplits,'\'); %rejoin string to get name of folder one up from plane data
+        baseDir = strjoin(dirSplits,'/'); %rejoin string to get name of folder one up from plane data
         date = datestr(now); %get current date/time
         chopDate = [date(1:2) '-' date(4:6) '-' date(10:11) '-' date(13:14) date(16:17)]; %chop date up
-        if ~exist([baseDir '\DataAnalysis'],'dir') %if directory doesn't exist
-            mkdir([baseDir '\DataAnalysis']); %make it
-            cd([baseDir '\DataAnalysis']); %go to it
+        if ~exist([baseDir '/DataAnalysis'],'dir') %if directory doesn't exist
+            mkdir([baseDir '/DataAnalysis']); %make it
+            cd([baseDir '/DataAnalysis']); %go to it
             writetable(pwvTable,['Summary_' chopDate '.xlsx'],'FileType','spreadsheet','Sheet',['Interpolation - ' interpTypes{t}]); %write excel sheet for each interp
             flow = handles.flow; %make variables for saving
             save('flow.mat','flow')
             save('pwvTable.mat','pwvTable')
         else %or if the directory already exists
-            cd([baseDir '\DataAnalysis']); %go to it
+            cd([baseDir '/DataAnalysis']); %go to it
             writetable(pwvTable,['Summary_' chopDate '.xlsx'],'FileType','spreadsheet','Sheet',['Interpolation - ' interpTypes{t}]);
             flow = handles.flow;
             save('flow.mat','flow')
@@ -1428,7 +1392,7 @@ function exportAnalysisButton_Callback(hObject, eventdata, handles)
         clear PLANES %need to do this because PLANES will keep getting transposed
     end 
     
-    cd([baseDir '\DataAnalysis']); %go to it
+    cd([baseDir '/DataAnalysis']); %go to it
     frame = getframe(handles.TimeVsDistance); %get snapshot of PWV plot 
     imwrite(frame2im(frame),'PWVanalysisPlot.png'); %write out to PNG
     anatDatasets = handles.anatDatasets;
