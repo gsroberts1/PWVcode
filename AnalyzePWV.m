@@ -1760,7 +1760,7 @@ function plotVelocity(handles)
     times = handles.pcDatasets(1).ROIdata(1).times;
     plot(times, zeros(1,length(times)) ,'Color','black','LineWidth',1.5); %line of y=0 (for visual reference)
     % Note that above we assume same time scale for each plane (MR scan)
-    
+    xlim([min(times) max(times)]);
     legendSet = {'Baseline'}; %add baseline to legend names
     for i=1:numel(handles.pcDatasets) %for all planes
         if isstruct(handles.pcDatasets(i).ROIdata) %if we've made ROI data for this dataset
